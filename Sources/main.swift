@@ -793,6 +793,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let taps = ["tap3": 3, "tap4": 4, "tap5": 5]
             TrackpadTap.shared.setFingers(taps[(obj["trackpad"] as? String) ?? "off"] ?? 0)
             sounds.enabled = (obj["sound"] as? Bool) ?? true
+            blurRadius = Int(max(0, min(40, (obj["blur"] as? Double) ?? 6)))
             sounds.volume = Float(max(0, min(1, (obj["volume"] as? Double) ?? 0.7)))
             let hk = (obj["hotkey"] as? String) ?? "alt+s"
             if hk != hotkeyText {
@@ -842,6 +843,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
 
     /// intro: play the launch sequence first (only used at app start).
+    var blurRadius = 6
+    var blurTimer: Timer?
+
     func show(intro: Bool = false) {
         guard pageReady else { return }
         sounds.invalidate()
@@ -852,6 +856,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         else { return }
         panel.setFrame(screen.frame, display: true)
         panel.orderFrontRegardless()
+        fadeBlur(to: blurRadius)
         panel.makeKey()
         panel.makeFirstResponder(webView)
         visible = true
@@ -875,8 +880,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
     }
 
+    /// Blurs whatever is behind the overlay, easing the radius in over ~0.2 s.
+    func fadeBlur(to target: Int) {
+        blurTimer?.invalidate()
+        guard target > 0 else { return setWindowBlur(panel, radius: 0) }
+        var step = 0
+        let steps = 8
+        blurTimer = Timer.scheduledTimer(withTimeInterval: 0.025, repeats: true) { [weak self] timer in
+            guard let self = self else { return timer.invalidate() }
+            step += 1
+            setWindowBlur(self.panel, radius: target * step / steps)
+            if step >= steps { timer.invalidate() }
+        }
+    }
+
     func hide() {
         visible = false
+        blurTimer?.invalidate()
+        setWindowBlur(panel, radius: 0)
         panel.orderOut(nil)
     }
 
@@ -1053,6 +1074,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
         return ["ok": true]
     }
+}
+
+/// Sets how much a window blurs what is behind it (0 turns it off). The window
+/// server has no public call for a plain adjustable blur, so this uses the
+/// private CoreGraphics one and does nothing if it is missing.
+func setWindowBlur(_ window: NSWindow, radius: Int) {
+    typealias ConnFn = @convention(c) () -> Int32
+    typealias BlurFn = @convention(c) (Int32, Int32, Int32) -> Int32
+    guard let lib = dlopen(nil, RTLD_NOW),
+          let conn = dlsym(lib, "CGSMainConnectionID"),
+          let blur = dlsym(lib, "CGSSetWindowBackgroundBlurRadius")
+    else { return }
+    let id = unsafeBitCast(conn, to: ConnFn.self)()
+    _ = unsafeBitCast(blur, to: BlurFn.self)(id, Int32(window.windowNumber), Int32(radius))
 }
 
 /// Locks the Mac right away, like Control-Command-Q. There is no public API for

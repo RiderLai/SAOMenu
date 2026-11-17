@@ -148,6 +148,9 @@ def main():
     volume = cfg.get("volume", 0.7)
     if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not 0 <= volume <= 1:
         errors.append("volume must be a number from 0 to 1")
+    blur = cfg.get("blur", 6)
+    if isinstance(blur, bool) or not isinstance(blur, (int, float)) or not 0 <= blur <= 40:
+        errors.append("blur must be a number from 0 to 40")
     if cfg.get("mouseGesture", "off") not in ("off", "right", "both", True, False):
         errors.append("mouseGesture must be 'right', 'both' or 'off'")
     if cfg.get("trackpad", "off") not in ("off", "tap3", "tap4", "tap5"):
