@@ -1,0 +1,69 @@
+{
+  "hotkey": "alt+s",
+  "sound": true,
+  "intro": true,
+  "menu": [
+    {
+      "icon": "user",
+      "label": "HOME",
+      "items": [
+        { "label": "Home", "icon": "home", "action": { "type": "open", "path": "~" } },
+        { "label": "Desktop", "icon": "desktop", "action": { "type": "open", "path": "~/Desktop" } },
+        { "label": "Documents", "action": { "type": "open", "path": "~/Documents" } },
+        { "label": "Downloads", "icon": "download", "action": { "type": "open", "path": "~/Downloads" } },
+        { "label": "Photos", "icon": "image", "action": { "type": "app", "app": "Photos" } },
+        { "label": "Music", "icon": "music", "action": { "type": "app", "app": "Music" } }
+      ]
+    },
+    {
+      "icon": "folder",
+      "label": "STORAGE",
+      "items": [
+        { "label": "Applications", "icon": "grid", "action": { "type": "open", "path": "/Applications" } },
+        {
+          "label": "Library",
+          "items": [
+            { "label": "Application Support", "action": { "type": "open", "path": "~/Library/Application Support" } },
+            { "label": "Preferences", "action": { "type": "open", "path": "~/Library/Preferences" } },
+            { "label": "Logs", "action": { "type": "open", "path": "~/Library/Logs" } }
+          ]
+        },
+        {
+          "label": "Files",
+          "items": [
+            { "label": ".zshrc", "action": { "type": "open", "path": "~/.zshrc", "app": "TextEdit" } },
+            { "label": "hosts", "icon": "file", "action": { "type": "open", "path": "/etc/hosts", "app": "TextEdit" } }
+          ]
+        }
+      ]
+    },
+    {
+      "icon": "globe",
+      "label": "WEB",
+      "items": [
+        { "label": "GitHub", "action": { "type": "url", "url": "https://github.com" } },
+        { "label": "Google", "action": { "type": "url", "url": "https://www.google.com" } },
+        { "label": "Safari", "icon": "grid", "action": { "type": "app", "app": "Safari" } }
+      ]
+    },
+    {
+      "icon": "terminal",
+      "label": "TERMINAL",
+      "items": [
+        { "label": "New Terminal", "action": { "type": "terminal", "cwd": "~" } },
+        { "label": "Disk Usage", "action": { "type": "terminal", "command": "df -h" } },
+        { "label": "Processes (top)", "action": { "type": "terminal", "command": "top" } }
+      ]
+    },
+    {
+      "icon": "gear",
+      "label": "SYSTEM",
+      "items": [
+        { "label": "Edit Menu Config", "icon": "code", "action": { "type": "open", "path": "~/.config/sao-menu/config.json", "app": "TextEdit" } },
+        { "label": "Config Folder", "action": { "type": "open", "path": "~/.config/sao-menu" } },
+        { "label": "System Settings", "action": { "type": "app", "app": "System Settings" } },
+        { "label": "Log Out", "action": { "type": "quit" } }
+      ]
+    }
+  ]
+}
