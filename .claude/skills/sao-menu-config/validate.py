@@ -12,13 +12,14 @@ import sys
 ICONS = {
     "user", "users", "message", "map", "gear", "folder", "file", "star", "home", "download",
     "desktop", "grid", "list", "code", "terminal", "globe", "image", "music", "book", "heart",
-    "logout", "sword",
+    "lock", "logout", "sword",
 }
 ACTION_FIELDS = {
     "open": {"path"},
     "app": {"app"},
     "url": {"url"},
     "terminal": set(),
+    "lock": set(),
     "settings": set(),
     "quit": set(),
 }

@@ -69,6 +69,7 @@
     if (node.items && node.items.length) return 'list';
     const a = node.action || {};
     if (a.type === 'quit') return 'logout';
+    if (a.type === 'lock') return 'lock';
     if (a.type === 'settings') return 'gear';
     if (a.type === 'url') return 'globe';
     if (a.type === 'terminal') return 'terminal';
@@ -115,10 +116,10 @@
     while (panels.length > level) panels.pop().remove();
   }
 
-  function shiftColumn() {
+  // The column stays where it dropped; (ax, ay) is its center.
+  function iconY(idx) {
     const n = (config.menu || []).length;
-    const off = path.length ? path[0] * STEP : ((n - 1) * STEP) / 2;
-    column.style.transform = `translateY(${-off}px)`;
+    return ay + (idx - (n - 1) / 2) * STEP;
   }
 
   let toastTimer = 0;
@@ -150,9 +151,7 @@
     const n = menu.length;
     const W = innerWidth, H = innerHeight;
 
-    // (ax, ay) is the anchor: the selected icon always slides to this point,
-    // so keep enough room for the column to shift fully up or down.
-    const span = Math.max(0, n - 1) * STEP + R + PAD;
+    const span = (Math.max(0, n - 1) * STEP) / 2 + R + PAD;
     ay = 2 * span <= H ? clamp(y, span, H - span) : H / 2;
     const totalW = 2 * R + GAP + depthOf(menu) * (PANEL_W + PGAP);
     ax = clamp(x - R, PAD, Math.max(PAD, W - totalW - PAD));
@@ -162,7 +161,7 @@
     column.style.top = ay + 'px';
     menu.forEach((node, i) => {
       const ic = el('div', 'icon', column);
-      ic.style.top = i * STEP - R + 'px';
+      ic.style.top = (i - (n - 1) / 2) * STEP - R + 'px';
       ic.style.setProperty('--i', i);
       ic.style.setProperty('--ri', n - 1 - i);
       glyph(node.icon || 'star', ic);
@@ -173,7 +172,6 @@
         select(0, i, { toggle: true });
       });
     });
-    shiftColumn();
 
     isOpen = true;
     requestAnimationFrame(() => stage.classList.add('open'));
@@ -254,7 +252,6 @@
     const prev = path[0];
     path = [];
     trimPanels(0);
-    shiftColumn();
     focus = { level: 0, idx: prev === undefined ? -1 : prev };
     refresh();
     sfx('back');
@@ -276,11 +273,10 @@
       path = path.slice(0, level);
       path.push(idx);
       trimPanels(level);
-      if (level === 0) shiftColumn();
     }
 
     if (hasItems) {
-      openPanel(level + 1, node, level === 0 ? ay : rowCenter(level, idx));
+      openPanel(level + 1, node, level === 0 ? iconY(idx) : rowCenter(level, idx));
       if (enter) focus = { level: level + 1, idx: 0 };
       sfx('select');
     } else if (run) {
@@ -296,8 +292,8 @@
     if (isQuit || a.confirm) {
       const msg = typeof a.confirm === 'string' ? a.confirm
         : isQuit ? '确定要登出并退出 SAO Menu 吗？'
-        : `确定要执行「${node.label || actionText(a)}」吗？`;
-      const yes = await confirmDialog(isQuit ? 'LOG OUT' : 'CONFIRM', msg);
+        : `是否确认执行该操作？「${node.label || actionText(a)}」`;
+      const yes = await confirmDialog('Message', msg);
       if (!yes || !isOpen || closing) return;
     }
     if (isQuit) return outro();
@@ -483,11 +479,19 @@
       const wrap = el('div', 'dialog-wrap', stage);
       const box = el('div', 'dialog', wrap);
       el('header', '', box).textContent = title;
-      el('div', 'msg', box).textContent = message;
+      const msg = el('div', 'msg', box);
+      // a trailing 「…」 names the target and goes on its own line, as in the show
+      const m = /^(.*?)(「[^」]*」)\s*$/.exec(message);
+      if (m && m[1].trim()) {
+        el('div', '', msg).textContent = m[1].trim();
+        el('div', '', msg).textContent = m[2];
+      } else {
+        msg.textContent = message;
+      }
       const btns = el('div', 'btns', box);
       const yes = el('div', 'btn yes', btns), no = el('div', 'btn no', btns);
-      yes.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>';
-      no.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      yes.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.2"/></svg>';
+      no.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7.2 7.2l9.6 9.6M16.8 7.2l-9.6 9.6"/></svg>';
       const d = (dialog = {
         choice: true,
         paint() {

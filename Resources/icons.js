@@ -20,6 +20,7 @@ window.SAO_ICONS = {
   music: '<path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
   book: '<path d="M5 4h13v16H6.5A1.5 1.5 0 0 1 5 18.5zM5 18.5A1.5 1.5 0 0 1 6.5 17H18"/>',
   heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3M12 14.5v2"/>',
   logout: '<path d="M10 4H5v16h5M14 8l4 4-4 4M9 12h9"/>',
   sword: '<path d="M20 4l-.6 3.8-8.4 8.2-2.9-2.9 8.2-8.4zM6.5 12.5l5 5M8 16l-4 4"/>',
 };

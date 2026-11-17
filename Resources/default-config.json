@@ -64,6 +64,7 @@
         { "label": "Settings", "action": { "type": "settings" } },
         { "label": "Config Folder", "action": { "type": "open", "path": "~/.config/sao-menu" } },
         { "label": "System Settings", "action": { "type": "app", "app": "System Settings" } },
+        { "label": "Lock Screen", "action": { "type": "lock" } },
         { "label": "Log Out", "action": { "type": "quit" } }
       ]
     }

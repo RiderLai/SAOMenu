@@ -18,6 +18,7 @@
     ['app', '打开应用'],
     ['url', '打开网页'],
     ['terminal', '终端命令'],
+    ['lock', '锁定屏幕'],
     ['settings', '打开本设置窗口'],
     ['quit', '退出程序'],
   ];
@@ -26,6 +27,7 @@
     app: { type: 'app', app: '' },
     url: { type: 'url', url: 'https://' },
     terminal: { type: 'terminal', cwd: '~', command: '' },
+    lock: { type: 'lock' },
     settings: { type: 'settings' },
     quit: { type: 'quit' },
   };
@@ -75,6 +77,7 @@
     if (node.items) return 'list';
     const a = node.action || {};
     if (a.type === 'quit') return 'logout';
+    if (a.type === 'lock') return 'lock';
     if (a.type === 'settings') return 'gear';
     if (a.type === 'url') return 'globe';
     if (a.type === 'terminal') return 'terminal';
@@ -340,6 +343,8 @@
     } else if (type === 'settings') {
       form.append(field('', h('span', { class: 'hint' }, '打开这个设置窗口。')));
       return;
+    } else if (type === 'lock') {
+      form.append(field('', h('span', { class: 'hint' }, '立即锁定 Mac，回到登录界面，需要密码或 Touch ID 才能解锁。')));
     }
 
     // optional confirmation before running

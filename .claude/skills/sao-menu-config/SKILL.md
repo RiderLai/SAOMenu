@@ -57,6 +57,7 @@ SAO Menu 是一个 macOS 快捷菜单：一列圆形图标，逐级展开面板�
 | `app` | `app` | 启动应用 |
 | `url` | `url`，可选 `app` | 打开网页；`app` 指定浏览器 |
 | `terminal` | 可选 `cwd`、`command`、`app` | 新开终端窗口，在 `cwd`（默认 `~`）执行 `command`，之后留在 shell；`app` 换终端，如 `iTerm` |
+| `lock` | 无 | 立即锁定屏幕 |
 | `settings` | 无 | 打开设置窗口 |
 | `quit` | 无 | 确认后退出程序 |
 
@@ -67,7 +68,7 @@ SAO Menu 是一个 macOS 快捷菜单：一列圆形图标，逐级展开面板�
 
 ### 图标
 
-内置名称：`user` `users` `message` `map` `gear` `folder` `file` `star` `home` `download` `desktop` `grid` `list` `code` `terminal` `globe` `image` `music` `book` `heart` `logout` `sword`。也可以写一个 emoji 或一两个字。
+内置名称：`user` `users` `message` `map` `gear` `folder` `file` `star` `home` `download` `desktop` `grid` `list` `code` `terminal` `globe` `image` `music` `book` `heart` `lock` `logout` `sword`。也可以写一个 emoji 或一两个字。
 
 ### 通用项
 

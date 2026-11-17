@@ -1040,6 +1040,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                 return fail("无法创建终端脚本：\(error.localizedDescription)")
             }
             launch([script], with: term)
+        case "lock":
+            guard lockScreen() else { return fail("无法锁定屏幕") }
         case "settings":
             DispatchQueue.main.async { self.openSettings() }
         case "quit":
@@ -1049,6 +1051,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
         return ["ok": true]
     }
+}
+
+/// Locks the Mac right away, like Control-Command-Q. There is no public API for
+/// this, so it uses the private login framework and falls back to sleeping the
+/// display (which locks only if a password is required on wake).
+func lockScreen() -> Bool {
+    if let lib = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_NOW),
+       let sym = dlsym(lib, "SACLockScreenImmediate") {
+        typealias Fn = @convention(c) () -> Int32
+        if unsafeBitCast(sym, to: Fn.self)() == 0 { return true }
+    }
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+    task.arguments = ["displaysleepnow"]
+    do { try task.run() } catch { return false }
+    task.waitUntilExit()
+    return task.terminationStatus == 0
 }
 
 let app = NSApplication.shared
