@@ -354,7 +354,7 @@ html, body {
   height: 74px;
   display: grid;
   place-items: center;
-  background: rgba(246, 246, 246, 0.95);
+  background: rgba(246, 246, 246, 0.86);
   font-family: "DIN Condensed", "Avenir Next Condensed", "Avenir Next", sans-serif;
   font-size: 25px;
   font-weight: 700;
@@ -369,7 +369,7 @@ html, body {
   display: grid;
   align-content: center;
   padding: 24px 30px;
-  background: rgba(205, 205, 205, 0.9);
+  background: rgba(205, 205, 205, 0.78);
   text-align: center;
   font-size: 15px;
   line-height: 1.75;
@@ -381,7 +381,7 @@ html, body {
   display: flex;
   justify-content: space-around;
   padding: 22px 46px 24px;
-  background: rgba(240, 240, 240, 0.95);
+  background: rgba(240, 240, 240, 0.86);
   box-shadow: 0 -3px 7px rgba(0, 0, 0, 0.16);
   position: relative;
 }
@@ -398,13 +398,9 @@ html, body {
   transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
 }
 .dialog .btn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; }
-.dialog .btn.yes { --c: #2f86e6; --glow: rgba(47, 134, 230, 0.4); }
-.dialog .btn.no { --c: #d8344c; --glow: rgba(216, 52, 76, 0.4); }
+.dialog .btn.yes { --c: #2f86e6; }
+.dialog .btn.no { --c: #d8344c; }
 .dialog .btn:hover { transform: scale(1.1); filter: brightness(1.08); }
-.dialog .btn.focus {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 2.5px #fff, 0 0 0 4px var(--c), 0 0 0 9px var(--glow), 0 3px 8px 3px rgba(0, 0, 0, 0.22);
-}
 
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes dialog-in { from { opacity: 0; transform: scaleY(0.08); } }
