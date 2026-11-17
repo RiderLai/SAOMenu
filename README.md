@@ -1,6 +1,12 @@
 # SAO Menu
 
-一个 SAO 风格的 macOS 快捷菜单：按热键在鼠标位置呼出一列圆形图标，逐级展开列表，打开文件夹或文件。
+一个《刀剑神域》（SAO）风格的 macOS 快捷启动菜单。按下热键或做一个手势，一列圆形图标就在鼠标位置落下，逐级展开面板，点一下即可执行你配置好的动作。
+
+- **四种动作**：打开文件或文件夹、启动应用、打开网页、在新终端窗口里执行命令。
+- **三种呼出方式**：全局热键、鼠标手势（按住右键向下划）、触控板手势（四指轻点），都可以改或关闭。
+- **完全自定义**：菜单的图标、层级和动作都由一份 JSON 配置决定，可以用图形化的设置窗口编辑，也可以直接改文件，或者交给 AI 助手来改。
+- **动画和音效**：启动时的登录动画、退出时的确认框和登出动画、各种操作的提示音；音效可以换成自己的音频文件。
+- **原生、无依赖**：Swift 编写，同时支持 Apple 芯片和 Intel，需要 macOS 12 及以上。
 
 ## 构建与运行
 
@@ -80,6 +86,32 @@
 - `sound` / `volume`：音效开关和音量（0–1，默认 0.7）。
 - 自定义音效：把音频文件放进 `~/.config/sao-menu/sounds/`，文件名为 `open` `close` `select` `move` `back` `launch` `error`（菜单）或 `dive` `tick` `welcome` `warp`（启动动画）之一，扩展名 `wav` / `mp3` / `m4a` / `aiff`，下次呼出菜单时生效；没有对应文件时用内置的合成音。
 - `icon`：内置名称 `user users message map gear folder file star home download desktop grid list code terminal globe image music book heart logout sword`，或者直接写一个 emoji / 文字。列表项不写 `icon` 时按路径自动选择。
+
+## 让 AI 助手修改配置
+
+仓库里带了一个给 [Claude Code](https://claude.com/claude-code) 用的 skill，放在 `.claude/skills/sao-menu-config/`。有了它，你可以直接用一句话让 AI 改菜单，例如：
+
+- “在 SAO 菜单里加一个打开 ~/Projects 的入口”
+- “把 WEB 里的 Google 换成 Bilibili”
+- “加一个终端命令，在我的项目目录里跑 npm run dev”
+- “把呼出热键改成 ctrl+alt+space”
+
+AI 会先确认你提到的路径、应用和网址真实存在，备份当前配置（`~/.config/sao-menu/config.agent-backup.json`），只做必要的改动，再用自带的校验脚本检查，最后告诉你改了什么。
+
+使用方法：
+
+- 在本仓库目录下启动 Claude Code，skill 会自动加载；说出需求即可，也可以用 `/sao-menu-config` 手动调用。
+- 想在任何目录下都能用，把这个文件夹复制到全局 skill 目录：
+
+  ```bash
+  cp -R .claude/skills/sao-menu-config ~/.claude/skills/
+  ```
+
+校验脚本也可以单独运行，检查手写的配置有没有问题：
+
+```bash
+python3 .claude/skills/sao-menu-config/validate.py
+```
 
 ## 声明
 
