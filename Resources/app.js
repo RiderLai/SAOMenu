@@ -177,11 +177,8 @@
       if (node.label) el('span', 'tip', ic).textContent = node.label;
       ic.addEventListener('mouseenter', () => {
         if (closing || (focus.level === 0 && focus.idx === i)) return;
-        // only take the focus ring while no panel has it
-        if (focus.level === 0) {
-          focus = { level: 0, idx: i };
-          refresh();
-        }
+        focus = { level: 0, idx: i };
+        refresh();
         if (path[0] !== i) sfx('move');
       });
       ic.addEventListener('click', (e) => {
