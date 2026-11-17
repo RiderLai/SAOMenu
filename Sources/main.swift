@@ -177,27 +177,46 @@ final class SoundBank {
 
 // MARK: - Mouse gesture
 
-/// Hold the left and right buttons together and drag down to summon the menu.
-/// With Accessibility permission an event tap swallows the second button press,
-/// so the app underneath never sees it. Without permission it falls back to
-/// just watching, which works but can let a context menu through.
+/// Summons the menu with a downward drag while holding the right button
+/// ("right") or the left and right buttons together ("both").
+///
+/// With Accessibility permission an event tap intercepts the presses, so the
+/// app underneath never sees a gesture. In "right" mode the right press is held
+/// back until it is clear whether it is a gesture; a plain right click is then
+/// replayed, so context menus open on release. Without permission the gesture
+/// is only observed, which fires but cannot keep a context menu from opening.
 final class MouseGesture {
+    enum Mode: String { case off, right, both }
+
     var onTrigger: (() -> Void)?
-    private var enabled = false
+    private var mode = Mode.off
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private var monitor: Any?
     private var retry: Timer?
 
-    private var start: CGPoint?
-    private var fired = false
+    private enum State { case idle, pending, fired }
+    private var state = State.idle
+    private var start = CGPoint.zero
+    private var heldDown: CGEvent?  // right press waiting to be replayed or dropped
     private var swallowUp: CGEventType?
+    private var watching = false
     private let distance: CGFloat = 70
+    private let replayed: Int64 = 0x53414F  // marks events this class posts itself
 
-    func setEnabled(_ on: Bool) {
-        guard on != enabled else { return }
-        enabled = on
-        if on { install() } else { remove() }
+    func setMode(_ next: Mode) {
+        guard next != mode else { return }
+        let wasOff = mode == .off
+        mode = next
+        reset()
+        if next == .off { remove() } else if wasOff { install() }
+    }
+
+    private func reset() {
+        state = .idle
+        heldDown = nil
+        swallowUp = nil
+        watching = false
     }
 
     private func install() {
@@ -209,8 +228,9 @@ final class MouseGesture {
         monitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in self?.watch() }
         // switch to the tap as soon as permission is granted
         retry = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            guard let self = self, self.enabled, self.tap == nil, self.installTap() else { return }
+            guard let self = self, self.mode != .off, self.tap == nil, self.installTap() else { return }
             self.removeMonitor()
+            self.reset()
         }
     }
 
@@ -230,8 +250,6 @@ final class MouseGesture {
         }
         tap = nil
         source = nil
-        start = nil
-        swallowUp = nil
     }
 
     private func installTap() -> Bool {
@@ -259,30 +277,83 @@ final class MouseGesture {
         return true
     }
 
+    /// Is the pointer far enough below the start, and moving mostly downward?
+    private func pulledDown(_ dx: CGFloat, _ dy: CGFloat) -> Bool {
+        dy > distance && abs(dx) < dy
+    }
+
+    private func post(_ event: CGEvent?) {
+        guard let event = event else { return }
+        event.setIntegerValueField(.eventSourceUserData, value: replayed)
+        event.post(tap: .cgSessionEventTap)
+    }
+
     /// Event tap path. Returns true to swallow the event.
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
-        switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let port = tap { CGEvent.tapEnable(tap: port, enable: true) }
             return false
+        }
+        if event.getIntegerValueField(.eventSourceUserData) == replayed { return false }
+        return mode == .right ? handleRight(type, event) : handleBoth(type, event)
+    }
+
+    private func handleRight(_ type: CGEventType, _ event: CGEvent) -> Bool {
+        switch type {
+        case .rightMouseDown:
+            state = .pending
+            start = event.location
+            heldDown = event.copy()
+            return true
+        case .rightMouseDragged:
+            guard state != .idle else { return false }
+            if state == .pending {
+                let dx = event.location.x - start.x, dy = event.location.y - start.y  // y grows downward
+                if pulledDown(dx, dy) {
+                    state = .fired
+                    heldDown = nil
+                    onTrigger?()
+                } else if dy < -30 || (abs(dx) > 30 && abs(dx) >= dy) {
+                    // going somewhere else: this is an ordinary right-drag, hand it back
+                    state = .idle
+                    post(heldDown)
+                    heldDown = nil
+                }
+            }
+            return true
+        case .rightMouseUp:
+            guard state != .idle else { return false }
+            if state == .pending {
+                // no gesture: deliver the click that was held back
+                post(heldDown)
+                post(event.copy())
+            }
+            state = .idle
+            heldDown = nil
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func handleBoth(_ type: CGEventType, _ event: CGEvent) -> Bool {
+        switch type {
         case .leftMouseDown, .rightMouseDown:
             let other: CGMouseButton = type == .leftMouseDown ? .right : .left
             guard CGEventSource.buttonState(.combinedSessionState, button: other) else { return false }
+            state = .pending
             start = event.location
-            fired = false
             swallowUp = type == .leftMouseDown ? .leftMouseUp : .rightMouseUp
             return true
         case .leftMouseDragged, .rightMouseDragged:
-            guard let s = start else { return false }
-            let p = event.location  // y grows downward here
-            let dy = p.y - s.y
-            if !fired && dy > distance && abs(p.x - s.x) < dy {
-                fired = true
+            guard state != .idle else { return false }
+            if state == .pending, pulledDown(event.location.x - start.x, event.location.y - start.y) {
+                state = .fired
                 onTrigger?()
             }
             return true
         case .leftMouseUp, .rightMouseUp:
-            start = nil
+            state = .idle
             if type == swallowUp {
                 swallowUp = nil
                 return true
@@ -295,20 +366,21 @@ final class MouseGesture {
 
     /// Fallback path without permission: observe only.
     private func watch() {
-        let both = NSEvent.pressedMouseButtons & 3 == 3
+        let buttons = NSEvent.pressedMouseButtons
+        let held = mode == .right ? buttons & 2 != 0 : buttons & 3 == 3
         let p = NSEvent.mouseLocation  // y grows upward here
-        guard both else {
-            start = nil
+        guard held else {
+            watching = false
             return
         }
-        guard let s = start else {
+        if !watching {
+            watching = true
+            state = .pending
             start = p
-            fired = false
             return
         }
-        let dy = s.y - p.y
-        if !fired && dy > distance && abs(p.x - s.x) < dy {
-            fired = true
+        if state == .pending, pulledDown(p.x - start.x, start.y - p.y) {
+            state = .fired
             onTrigger?()
         }
     }
@@ -715,7 +787,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let json = String(data: try JSONSerialization.data(withJSONObject: obj), encoding: .utf8)!
             webView.evaluateJavaScript("SAO.setConfig(\(json))")
             introEnabled = (obj["intro"] as? Bool) ?? true
-            mouseGesture.setEnabled((obj["mouseGesture"] as? Bool) ?? false)
+            // "right" / "both" / "off"; a plain true from older configs means "both"
+            let gesture = (obj["mouseGesture"] as? String) ?? ((obj["mouseGesture"] as? Bool) == true ? "both" : "off")
+            mouseGesture.setMode(MouseGesture.Mode(rawValue: gesture) ?? .off)
             let taps = ["tap3": 3, "tap4": 4, "tap5": 5]
             TrackpadTap.shared.setFingers(taps[(obj["trackpad"] as? String) ?? "off"] ?? 0)
             sounds.enabled = (obj["sound"] as? Bool) ?? true

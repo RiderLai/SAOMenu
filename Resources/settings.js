@@ -416,6 +416,19 @@
     return btn;
   }
 
+  function mouseSelect() {
+    const options = [['off', '关闭'], ['right', '按住右键向下划'], ['both', '同时按住左右键向下划']];
+    const box = h('select', {
+      onchange: () => {
+        cfg.mouseGesture = box.value;
+        changed();
+      },
+    }, options.map(([v, name]) => h('option', { value: v }, name)));
+    const current = cfg.mouseGesture === true ? 'both' : cfg.mouseGesture; // true: older configs
+    box.value = options.some(([v]) => v === current) ? current : 'off';
+    return box;
+  }
+
   function trackpadSelect() {
     const options = [['off', '关闭'], ['tap4', '四指轻点（推荐）'], ['tap5', '五指轻点'], ['tap3', '三指轻点']];
     const box = h('select', {
@@ -443,11 +456,10 @@
 
     form.append(
       field('呼出热键', hotkeyButton(), h('span', { class: 'hint' }, '点击按钮后按下新的组合键，Esc 取消。')),
-      field('鼠标手势',
-        check('同时按住左键和右键向下划，呼出菜单', cfg.mouseGesture === true, (on) => { cfg.mouseGesture = on; changed(); }),
-        trusted
-          ? h('span', { class: 'hint' }, '已获得「辅助功能」权限，手势中的按键不会传给下面的应用。')
-          : h('span', { class: 'hint' }, '没有「辅助功能」权限时也能用，但下面的应用可能同时弹出右键菜单。授权后会自动切换。'),
+      field('鼠标手势', mouseSelect(),
+        h('span', { class: 'hint' }, trusted
+          ? '已获得「辅助功能」权限：手势不会传给下面的应用。右键模式下，普通右键菜单会在松开按键时弹出。'
+          : '没有「辅助功能」权限时只能旁观：手势能触发，但下面的应用会同时弹出右键菜单，右键模式尤其明显。授权后自动切换。'),
         trusted ? null : h('button', { onclick: () => send({ cmd: 'axPrompt' }) }, '去授权…')),
       field('触控板手势', trackpadSelect(),
         h('span', { class: 'hint' }, '轻点不会和系统的滑动、捏合手势冲突，再点一次收起菜单。如果系统开启了「三指轻点查询」，不要选三指。')),

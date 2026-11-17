@@ -2,7 +2,7 @@
   "hotkey": "alt+s",
   "sound": true,
   "intro": true,
-  "mouseGesture": true,
+  "mouseGesture": "right",
   "trackpad": "tap4",
   "menu": [
     {
