@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div id="app">
+  <aside>
+    <div id="tree"></div>
+    <div id="tools">
+      <button id="add" title="在当前项后面添加一项">＋ 添加</button>
+      <button id="addChild" title="给当前子菜单添加一个子项">＋ 子项</button>
+      <span class="grow"></span>
+      <button id="up" title="上移">↑</button>
+      <button id="down" title="下移">↓</button>
+      <button id="del" class="danger" title="删除当前项">删除</button>
+    </div>
+  </aside>
+  <main>
+    <header>
+      <h1 id="title"></h1>
+      <span id="status"></span>
+    </header>
+    <div id="form"></div>
+    <footer>
+      <button id="preview">预览菜单</button>
+      <span class="grow"></span>
+      <button id="openFile">打开配置文件</button>
+      <button id="restore" class="danger">恢复默认配置</button>
+    </footer>
+  </main>
+</div>
+<div id="error" hidden>
+  <h1>配置文件无法读取</h1>
+  <p id="errorText"></p>
+  <div>
+    <button id="errOpen">打开配置文件</button>
+    <button id="errRestore" class="danger">用默认配置覆盖</button>
+  </div>
+</div>
+<script src="icons.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

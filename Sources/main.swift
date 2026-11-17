@@ -2,6 +2,7 @@ import Cocoa
 import WebKit
 import Carbon.HIToolbox
 import AVFoundation
+import UniformTypeIdentifiers
 
 // MARK: - Paths
 
@@ -202,6 +203,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     var pendingToast: String?
     let sounds = SoundBank()
     var introEnabled = true
+    var settingsWindow: NSWindow?
+    var settingsWeb: WKWebView?
 
     // MARK: Lifecycle
 
@@ -209,6 +212,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         ensureDefaultConfig()
         buildPanel()
         buildStatusItem()
+        buildMainMenu()
         installHotKeyHandler()
         registerHotKey(hotkeyText)
     }
@@ -256,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         }
         let menu = NSMenu()
         menu.addItem(withTitle: "呼出菜单", action: #selector(showFromMenu), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "编辑配置…", action: #selector(editConfig), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "设置…", action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "退出 SAO Menu", action: #selector(quit), keyEquivalent: "q").target = self
         statusItem.menu = menu
@@ -264,6 +268,139 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
 
     @objc func showFromMenu() { show() }
     @objc func quit() { NSApp.terminate(nil) }
+    /// The app has no menu bar of its own, but text fields in the settings window
+    /// only get ⌘C / ⌘V / ⌘A etc. through a main menu.
+    func buildMainMenu() {
+        let main = NSMenu()
+        let appItem = NSMenuItem()
+        appItem.submenu = NSMenu()
+        appItem.submenu?.addItem(withTitle: "退出 SAO Menu", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        main.addItem(appItem)
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "编辑")
+        edit.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "拷贝", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        editItem.submenu = edit
+        main.addItem(editItem)
+        NSApp.mainMenu = main
+    }
+
+    // MARK: Settings window
+
+    @objc func openSettings() {
+        // keep the last config that was in place before this editing session
+        let backup = configDir.appendingPathComponent("config.backup.json")
+        try? FileManager.default.removeItem(at: backup)
+        try? FileManager.default.copyItem(at: configURL, to: backup)
+
+        if let web = settingsWeb {
+            web.evaluateJavaScript("Settings.reload()")
+        } else {
+            let cfg = WKWebViewConfiguration()
+            cfg.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "settings")
+            let frame = NSRect(x: 0, y: 0, width: 940, height: 660)
+            let web = WKWebView(frame: frame, configuration: cfg)
+            if #available(macOS 13.3, *) { web.isInspectable = true }
+            let win = NSWindow(
+                contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered, defer: false)
+            win.title = "SAO Menu 设置"
+            win.isReleasedWhenClosed = false
+            win.minSize = NSSize(width: 760, height: 480)
+            win.contentView = web
+            win.center()
+            let res = Bundle.main.resourceURL!
+            web.loadFileURL(res.appendingPathComponent("settings.html"), allowingReadAccessTo: res)
+            settingsWindow = win
+            settingsWeb = web
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    func handleSettings(_ cmd: String, _ body: [String: Any], _ reply: @escaping (Any?, String?) -> Void) {
+        switch cmd {
+        case "load":
+            let text = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
+            let defaults = Bundle.main.url(forResource: "default-config", withExtension: "json")
+                .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "{}"
+            reply(["text": text, "defaults": defaults], nil)
+        case "save":
+            guard let text = body["text"] as? String, let data = text.data(using: .utf8),
+                (try? JSONSerialization.jsonObject(with: data)) is [String: Any]
+            else {
+                reply(["ok": false, "error": "配置内容无效"], nil)
+                return
+            }
+            do {
+                try FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
+                try data.write(to: configURL, options: .atomic)
+            } catch {
+                reply(["ok": false, "error": "写入失败：\(error.localizedDescription)"], nil)
+                return
+            }
+            reloadConfigIfChanged()  // applies a changed hotkey right away
+            var result: [String: Any] = ["ok": true]
+            if let warning = pendingToast {
+                result["warning"] = warning
+                pendingToast = nil
+            }
+            reply(result, nil)
+        case "pick":
+            let kind = body["kind"] as? String ?? "file"
+            let open = NSOpenPanel()
+            open.canChooseFiles = kind != "dir"
+            open.canChooseDirectories = kind != "app"
+            open.treatsFilePackagesAsDirectories = false
+            if kind == "app" {
+                open.allowedContentTypes = [.application]
+                open.directoryURL = URL(fileURLWithPath: "/Applications")
+            }
+            open.begin { response in
+                guard response == .OK, let url = open.url else {
+                    reply(["path": NSNull()], nil)
+                    return
+                }
+                var path = (url.path as NSString).abbreviatingWithTildeInPath
+                if kind == "app" {
+                    // prefer the plain name when it resolves to the same app
+                    let name = url.deletingPathExtension().lastPathComponent
+                    if self.resolveApp(name)?.standardizedFileURL.path == url.standardizedFileURL.path {
+                        path = name
+                    }
+                }
+                reply(["path": path], nil)
+            }
+        case "hotkey":
+            // while the settings window records a new hotkey, the old one must not fire
+            if body["suspend"] as? Bool == true {
+                if let ref = hotKeyRef {
+                    UnregisterEventHotKey(ref)
+                    hotKeyRef = nil
+                }
+            } else {
+                registerHotKey(hotkeyText)
+                pendingToast = nil
+            }
+            reply(["ok": true], nil)
+        case "preview":
+            show()
+            reply(["ok": true], nil)
+        case "openFile":
+            editConfig()
+            reply(["ok": true], nil)
+        default:
+            reply(nil, "unknown cmd \(cmd)")
+        }
+    }
+
     @objc func editConfig() {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
@@ -398,6 +535,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     ) {
         guard let body = message.body as? [String: Any], let cmd = body["cmd"] as? String else {
             replyHandler(nil, "bad message")
+            return
+        }
+        if message.name == "settings" {
+            handleSettings(cmd, body, replyHandler)
             return
         }
         switch cmd {
@@ -542,6 +683,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                 return fail("无法创建终端脚本：\(error.localizedDescription)")
             }
             launch([script], with: term)
+        case "settings":
+            DispatchQueue.main.async { self.openSettings() }
         case "quit":
             DispatchQueue.main.async { NSApp.terminate(nil) }
         default:
