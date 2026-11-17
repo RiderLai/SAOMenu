@@ -2,7 +2,7 @@
 
 一个《刀剑神域》（SAO）风格的 macOS 快捷启动菜单。按下热键或做一个手势，一列圆形图标就在鼠标位置落下，逐级展开面板，点一下即可执行你配置好的动作。
 
-- **多种动作**：打开文件或文件夹、启动应用、打开网页、在新终端窗口里执行命令、锁定屏幕。
+- **多种动作**：打开文件或文件夹、启动应用、打开网页、在新终端窗口里执行命令，以及锁屏、睡眠、截图、切换深色模式等系统功能。
 - **三种呼出方式**：全局热键、鼠标手势（按住右键向下划）、触控板手势（四指轻点），都可以改或关闭。
 - **完全自定义**：菜单的图标、层级和动作都由一份 JSON 配置决定，可以用图形化的设置窗口编辑，也可以直接改文件，或者交给 AI 助手来改。
 - **动画和音效**：启动时的登录动画、退出时的确认框和登出动画、各种操作的提示音；音效可以换成自己的音频文件。
@@ -37,7 +37,7 @@
 点菜单栏图标 →「设置…」，或在菜单里选 SYSTEM → Settings，打开图形化的设置窗口：
 
 - 左侧是菜单树：添加、添加子项、上移、下移、删除。最外层每一项是一个圆形图标。
-- 右侧编辑选中的项：名称、图标、类型（子菜单 / 打开文件或文件夹 / 打开应用 / 打开网页 / 终端命令 / 锁定屏幕 / 退出等）以及对应的路径、网址、命令，路径和应用可以用系统的选择框挑选。
+- 右侧编辑选中的项：名称、图标、类型（子菜单 / 打开文件或文件夹 / 打开应用 / 打开网页 / 终端命令 / 系统功能 / 退出等）以及对应的路径、网址、命令，路径和应用可以用系统的选择框挑选。
 - 「通用设置」里改热键（点击后直接按组合键）、音效、音量、启动动画和欢迎语。
 - 修改自动保存，下次呼出菜单生效；每次打开设置窗口时，当时的配置会备份到 `~/.config/sao-menu/config.backup.json`。
 
@@ -73,7 +73,22 @@
   - `app`：启动应用，如 `{ "type": "app", "app": "Music" }`。
   - `url`：打开网页，如 `{ "type": "url", "url": "https://github.com" }`，可选 `app` 指定浏览器。
   - `terminal`：新开终端窗口，在 `cwd`（默认 `~`）下执行 `command`，执行完留在 shell 里；两者都可省略。可选 `app` 换成其他终端，如 `"iTerm"`。例：`{ "type": "terminal", "cwd": "~/my/sao-menu", "command": "./build.sh run" }`。
-  - `lock`：立即锁定屏幕，回到登录界面。
+  - `system`：执行一个 macOS 系统功能，用 `name` 指定，如 `{ "type": "system", "name": "lock" }`：
+
+    | `name` | 功能 |
+    | --- | --- |
+    | `lock` | 立即锁定屏幕 |
+    | `screensaver` | 启动屏幕保护程序 |
+    | `displaySleep` | 关闭显示器 |
+    | `sleep` | 睡眠 |
+    | `screenshot` | 打开系统截图工具 |
+    | `darkMode` | 切换深色 / 浅色模式 |
+    | `mute` | 静音 / 取消静音 |
+    | `missionControl` | 调度中心 |
+    | `emptyTrash` | 清倒废纸篓（建议加 `confirm`） |
+    | `restart` / `shutdown` / `logout` | 重启 / 关机 / 退出登录，会弹出系统自己的确认框 |
+
+    `darkMode`、`emptyTrash`、`restart`、`shutdown`、`logout` 第一次使用时，系统会询问是否允许 SAO Menu 控制其他应用，需要点允许。
   - `settings`：打开设置窗口。
   - `quit`：退出 SAO Menu，会先弹出确认框，确认后播放登出动画。
 - 二次确认：任何动作都可以加 `"confirm": true` 或 `"confirm": "提示文字"`，执行前弹出确认框（`Enter` / `Y` 确认，`Esc` / `N` 取消）。
@@ -86,7 +101,7 @@
 - `welcome`：启动动画结尾的欢迎语，默认 `Welcome to Sword Art Online!`。
 - `sound` / `volume`：音效开关和音量（0–1，默认 0.7）。
 - 自定义音效：把音频文件放进 `~/.config/sao-menu/sounds/`，文件名为 `open` `close` `select` `move` `back` `launch` `error`（菜单）或 `dive` `tick` `welcome` `warp`（启动动画）之一，扩展名 `wav` / `mp3` / `m4a` / `aiff`，下次呼出菜单时生效；没有对应文件时用内置的合成音。
-- `icon`：内置名称 `user users message map gear folder file star home download desktop grid list code terminal globe image music book heart lock logout sword`，或者直接写一个 emoji / 文字。列表项不写 `icon` 时按路径自动选择。
+- `icon`：内置名称 `user users message map gear folder file star home download desktop grid list code terminal globe image music book heart lock moon power camera trash volume refresh logout sword`，或者直接写一个 emoji / 文字。列表项不写 `icon` 时按路径自动选择。
 
 ## 让 AI 助手修改配置
 

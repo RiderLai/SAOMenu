@@ -5,6 +5,7 @@
   const R = 30, STEP = 76, PANEL_W = 236, GAP = 26, PGAP = 22, PAD = 16;
 
   const ICONS = window.SAO_ICONS;
+  const SYSTEM_ICONS = { lock: 'lock', sleep: 'moon', displaySleep: 'desktop', screensaver: 'star', screenshot: 'camera', darkMode: 'moon', mute: 'volume', emptyTrash: 'trash', missionControl: 'grid', restart: 'refresh', shutdown: 'power', logout: 'logout' };
 
   const stage = document.getElementById('stage');
   const toastEl = document.getElementById('toast');
@@ -58,7 +59,8 @@
     }
     appIcons.get(a.app).then((res) => {
       if (!res || !res.icon || !holder.isConnected) return;
-      holder.textContent = '';
+      const g = holder.querySelector('.glyph');
+      if (g) g.remove();
       holder.classList.add('app');
       el('img', '', holder).src = res.icon;
     });
@@ -70,6 +72,7 @@
     const a = node.action || {};
     if (a.type === 'quit') return 'logout';
     if (a.type === 'lock') return 'lock';
+    if (a.type === 'system') return SYSTEM_ICONS[a.name] || 'gear';
     if (a.type === 'settings') return 'gear';
     if (a.type === 'url') return 'globe';
     if (a.type === 'terminal') return 'terminal';
@@ -109,6 +112,11 @@
         e.classList.toggle('selected', path[level] === i);
         e.classList.toggle('focus', focus.level === level && focus.idx === i);
       });
+    }
+    if (column) {
+      // name tags sit on the right until a panel takes that side
+      column.classList.toggle('tips-left', path.length > 0);
+      column.classList.toggle('tips-off', path.length > 0 && ax < 130);
     }
   }
 
@@ -166,6 +174,16 @@
       ic.style.setProperty('--ri', n - 1 - i);
       glyph(node.icon || 'star', ic);
       useAppIcon(node, ic);
+      if (node.label) el('span', 'tip', ic).textContent = node.label;
+      ic.addEventListener('mouseenter', () => {
+        if (closing || (focus.level === 0 && focus.idx === i)) return;
+        // only take the focus ring while no panel has it
+        if (focus.level === 0) {
+          focus = { level: 0, idx: i };
+          refresh();
+        }
+        if (path[0] !== i) sfx('move');
+      });
       ic.addEventListener('click', (e) => {
         e.stopPropagation();
         focus = { level: 0, idx: i };
@@ -223,8 +241,14 @@
         select(level, i);
       });
     });
+    // fade the edge that has more rows beyond it
+    const edges = () => {
+      rows.classList.toggle('more-up', rows.scrollTop > 2);
+      rows.classList.toggle('more-down', rows.scrollTop + rows.clientHeight < rows.scrollHeight - 2);
+    };
     // a child panel points at a row; scrolling would leave it pointing at nothing
     rows.addEventListener('scroll', () => {
+      edges();
       if (path.length > level) {
         path = path.slice(0, level);
         trimPanels(level);
@@ -238,6 +262,7 @@
     p.style.top = top + 'px';
     p.style.setProperty('--py', clamp(targetY - top, 16, h - 16) + 'px');
     p._top = top;
+    edges();
     panels.push(p);
   }
 

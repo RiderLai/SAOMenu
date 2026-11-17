@@ -57,10 +57,11 @@ SAO Menu 是一个 macOS 快捷菜单：一列圆形图标，逐级展开面板�
 | `app` | `app` | 启动应用 |
 | `url` | `url`，可选 `app` | 打开网页；`app` 指定浏览器 |
 | `terminal` | 可选 `cwd`、`command`、`app` | 新开终端窗口，在 `cwd`（默认 `~`）执行 `command`，之后留在 shell；`app` 换终端，如 `iTerm` |
-| `lock` | 无 | 立即锁定屏幕 |
+| `system` | `name` | 执行一个 macOS 系统功能，见下 |
 | `settings` | 无 | 打开设置窗口 |
 | `quit` | 无 | 确认后退出程序 |
 
+- `system` 的 `name`：`lock`（锁屏）`screensaver`（屏保）`displaySleep`（关显示器）`sleep`（睡眠）`screenshot`（截图工具）`darkMode`（切换深浅色）`mute`（切换静音）`missionControl`（调度中心）`emptyTrash`（清倒废纸篓，务必加 `confirm`）`restart` `shutdown` `logout`（重启、关机、退出登录，系统会自己弹确认框）。注意 `logout` 是退出 macOS 用户，退出 SAO Menu 本身用 `quit`。
 - `app` 的值可以是应用名（`Visual Studio Code`）、完整路径或 bundle id。
 - 路径支持 `~`。
 - `command` 在交互式 zsh 里执行，用户的别名和 PATH 可用；多条命令用换行或 `&&` 连接。
@@ -68,7 +69,7 @@ SAO Menu 是一个 macOS 快捷菜单：一列圆形图标，逐级展开面板�
 
 ### 图标
 
-内置名称：`user` `users` `message` `map` `gear` `folder` `file` `star` `home` `download` `desktop` `grid` `list` `code` `terminal` `globe` `image` `music` `book` `heart` `lock` `logout` `sword`。也可以写一个 emoji 或一两个字。
+内置名称：`user` `users` `message` `map` `gear` `folder` `file` `star` `home` `download` `desktop` `grid` `list` `code` `terminal` `globe` `image` `music` `book` `heart` `lock` `moon` `power` `camera` `trash` `volume` `refresh` `logout` `sword`。也可以写一个 emoji 或一两个字。
 
 ### 通用项
 

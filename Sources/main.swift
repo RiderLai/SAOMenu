@@ -1042,6 +1042,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             launch([script], with: term)
         case "lock":
             guard lockScreen() else { return fail("无法锁定屏幕") }
+        case "system":
+            if let err = runSystem(text("name")) { return fail(err) }
         case "settings":
             DispatchQueue.main.async { self.openSettings() }
         case "quit":
@@ -1068,6 +1070,55 @@ func lockScreen() -> Bool {
     do { try task.run() } catch { return false }
     task.waitUntilExit()
     return task.terminationStatus == 0
+}
+
+/// Runs a tool and waits for it. Returns its exit status and stderr.
+func runTool(_ path: String, _ args: [String]) -> (ok: Bool, err: String) {
+    let task = Process(), pipe = Pipe()
+    task.executableURL = URL(fileURLWithPath: path)
+    task.arguments = args
+    task.standardError = pipe
+    task.standardOutput = FileHandle.nullDevice
+    do { try task.run() } catch { return (false, error.localizedDescription) }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    task.waitUntilExit()
+    return (task.terminationStatus == 0, String(data: data, encoding: .utf8) ?? "")
+}
+
+/// Built-in macOS functions for the "system" action. Returns an error message, or nil.
+func runSystem(_ name: String) -> String? {
+    func tool(_ path: String, _ args: String...) -> String? {
+        runTool(path, args).ok ? nil : "执行失败：\(name)"
+    }
+    func script(_ source: String, target: String) -> String? {
+        let res = runTool("/usr/bin/osascript", ["-e", source])
+        if res.ok { return nil }
+        if res.err.contains("-1743") || res.err.contains("-10004") {
+            return "没有权限：请在 系统设置 → 隐私与安全性 → 自动化 里允许 SAO Menu 控制“\(target)”"
+        }
+        NSLog("system %@ failed: %@", name, res.err)
+        return "执行失败：\(name)"
+    }
+    switch name {
+    case "lock": return lockScreen() ? nil : "无法锁定屏幕"
+    case "sleep": return tool("/usr/bin/pmset", "sleepnow")
+    case "displaySleep": return tool("/usr/bin/pmset", "displaysleepnow")
+    case "screensaver": return tool("/usr/bin/open", "-a", "ScreenSaverEngine")
+    case "screenshot": return tool("/usr/bin/open", "-a", "Screenshot")
+    case "missionControl": return tool("/usr/bin/open", "-a", "Mission Control")
+    case "mute":
+        return script("set volume output muted (not (output muted of (get volume settings)))", target: "系统")
+    case "darkMode":
+        return script("tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode",
+                      target: "System Events")
+    case "emptyTrash":
+        return script("tell application \"Finder\" to if (count of items of trash) > 0 then empty trash", target: "访达")
+    // these three bring up the system's own confirmation dialog
+    case "restart": return script("tell application \"loginwindow\" to «event aevtrrst»", target: "loginwindow")
+    case "shutdown": return script("tell application \"loginwindow\" to «event aevtrsdn»", target: "loginwindow")
+    case "logout": return script("tell application \"loginwindow\" to «event aevtlogo»", target: "loginwindow")
+    default: return "未知的系统功能：\(name)"
+    }
 }
 
 let app = NSApplication.shared

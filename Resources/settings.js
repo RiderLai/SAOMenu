@@ -18,16 +18,32 @@
     ['app', '打开应用'],
     ['url', '打开网页'],
     ['terminal', '终端命令'],
-    ['lock', '锁定屏幕'],
+    ['system', '系统功能'],
     ['settings', '打开本设置窗口'],
     ['quit', '退出程序'],
   ];
+  // [name, label, hint] for the "system" action
+  const SYSTEM = [
+    ['lock', '锁定屏幕', '立即锁定 Mac，需要密码或 Touch ID 才能解锁。'],
+    ['screensaver', '启动屏幕保护程序', ''],
+    ['displaySleep', '关闭显示器', '只让显示器睡眠，电脑继续运行。'],
+    ['sleep', '睡眠', '让 Mac 进入睡眠。'],
+    ['screenshot', '截图', '打开系统的截图工具栏，可以截图或录屏。'],
+    ['darkMode', '切换深色 / 浅色模式', '第一次使用时系统会询问是否允许 SAO Menu 控制 “System Events”，需要点允许。'],
+    ['mute', '静音 / 取消静音', ''],
+    ['missionControl', '调度中心', '显示所有打开的窗口和桌面。'],
+    ['emptyTrash', '清倒废纸篓', '删除后无法恢复，建议勾选下面的二次确认。第一次使用时需要允许 SAO Menu 控制 “访达”。'],
+    ['restart', '重新启动…', '弹出系统自己的确认框，可以在那里取消。'],
+    ['shutdown', '关机…', '弹出系统自己的确认框，可以在那里取消。'],
+    ['logout', '退出登录…', '退出当前 macOS 用户，会弹出系统自己的确认框。'],
+  ];
+  const SYSTEM_ICONS = { lock: 'lock', sleep: 'moon', displaySleep: 'desktop', screensaver: 'star', screenshot: 'camera', darkMode: 'moon', mute: 'volume', emptyTrash: 'trash', missionControl: 'grid', restart: 'refresh', shutdown: 'power', logout: 'logout' };
   const NEW_ACTION = {
     open: { type: 'open', path: '~' },
     app: { type: 'app', app: '' },
     url: { type: 'url', url: 'https://' },
     terminal: { type: 'terminal', cwd: '~', command: '' },
-    lock: { type: 'lock' },
+    system: { type: 'system', name: 'lock' },
     settings: { type: 'settings' },
     quit: { type: 'quit' },
   };
@@ -78,6 +94,7 @@
     const a = node.action || {};
     if (a.type === 'quit') return 'logout';
     if (a.type === 'lock') return 'lock';
+    if (a.type === 'system') return SYSTEM_ICONS[a.name] || 'gear';
     if (a.type === 'settings') return 'gear';
     if (a.type === 'url') return 'globe';
     if (a.type === 'terminal') return 'terminal';
@@ -343,8 +360,20 @@
     } else if (type === 'settings') {
       form.append(field('', h('span', { class: 'hint' }, '打开这个设置窗口。')));
       return;
-    } else if (type === 'lock') {
-      form.append(field('', h('span', { class: 'hint' }, '立即锁定 Mac，回到登录界面，需要密码或 Touch ID 才能解锁。')));
+    } else if (type === 'system') {
+      const hint = h('span', { class: 'hint' });
+      const box = h('select', {
+        onchange: () => {
+          a.name = box.value;
+          render();
+          changed();
+        },
+      }, SYSTEM.map(([v, name]) => h('option', { value: v }, name)));
+      const cur = SYSTEM.find(([v]) => v === a.name) || SYSTEM[0];
+      box.value = cur[0];
+      hint.textContent = cur[2];
+      form.append(field('功能', box));
+      if (cur[2]) form.append(field('', hint));
     }
 
     // optional confirmation before running

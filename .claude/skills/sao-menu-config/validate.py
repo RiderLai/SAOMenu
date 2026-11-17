@@ -12,16 +12,21 @@ import sys
 ICONS = {
     "user", "users", "message", "map", "gear", "folder", "file", "star", "home", "download",
     "desktop", "grid", "list", "code", "terminal", "globe", "image", "music", "book", "heart",
-    "lock", "logout", "sword",
+    "lock", "moon", "power", "camera", "trash", "volume", "refresh", "logout", "sword",
 }
 ACTION_FIELDS = {
     "open": {"path"},
     "app": {"app"},
     "url": {"url"},
     "terminal": set(),
-    "lock": set(),
+    "lock": set(),  # older spelling of system/lock
+    "system": {"name"},
     "settings": set(),
     "quit": set(),
+}
+SYSTEM_NAMES = {
+    "lock", "sleep", "displaySleep", "screensaver", "screenshot", "darkMode", "mute",
+    "missionControl", "emptyTrash", "restart", "shutdown", "logout",
 }
 MODIFIERS = {"cmd", "command", "alt", "option", "opt", "ctrl", "control", "shift"}
 KEYS = set("abcdefghijklmnopqrstuvwxyz0123456789=-[]';\\,/.`") | {
@@ -63,6 +68,8 @@ def check_action(action, where):
     for key in ACTION_FIELDS[kind]:
         if not isinstance(action.get(key), str) or not action[key].strip():
             errors.append(f"{where}: action type '{kind}' needs a non-empty '{key}'")
+    if kind == "system" and isinstance(action.get("name"), str) and action["name"] not in SYSTEM_NAMES:
+        errors.append(f"{where}: unknown system function '{action['name']}'")
     for key in ("path", "cwd"):
         value = action.get(key)
         if isinstance(value, str) and value and not os.path.exists(os.path.expanduser(value)):

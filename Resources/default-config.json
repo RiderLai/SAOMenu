@@ -64,8 +64,25 @@
         { "label": "Settings", "action": { "type": "settings" } },
         { "label": "Config Folder", "action": { "type": "open", "path": "~/.config/sao-menu" } },
         { "label": "System Settings", "action": { "type": "app", "app": "System Settings" } },
-        { "label": "Lock Screen", "action": { "type": "lock" } },
+        { "label": "Screenshot", "action": { "type": "system", "name": "screenshot" } },
+        { "label": "Dark Mode", "action": { "type": "system", "name": "darkMode" } },
+        { "label": "Mute", "action": { "type": "system", "name": "mute" } },
+        { "label": "Mission Control", "action": { "type": "system", "name": "missionControl" } },
+        { "label": "Empty Trash", "action": { "type": "system", "name": "emptyTrash", "confirm": "是否确认清倒废纸篓？" } },
         { "label": "Log Out", "action": { "type": "quit" } }
+      ]
+    },
+    {
+      "icon": "power",
+      "label": "POWER",
+      "items": [
+        { "label": "Lock Screen", "action": { "type": "system", "name": "lock" } },
+        { "label": "Screen Saver", "action": { "type": "system", "name": "screensaver" } },
+        { "label": "Display Off", "action": { "type": "system", "name": "displaySleep" } },
+        { "label": "Sleep", "action": { "type": "system", "name": "sleep" } },
+        { "label": "Restart…", "action": { "type": "system", "name": "restart" } },
+        { "label": "Shut Down…", "action": { "type": "system", "name": "shutdown" } },
+        { "label": "Sign Out…", "action": { "type": "system", "name": "logout" } }
       ]
     }
   ]

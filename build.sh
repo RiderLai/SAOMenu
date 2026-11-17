@@ -35,6 +35,7 @@ cat > "$APP/Contents/Info.plist" <<'EOF'
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>SAO Menu 需要控制其他应用，才能执行切换深色模式、清倒废纸篓、重启等系统功能。</string>
 </dict>
 </plist>
 EOF
