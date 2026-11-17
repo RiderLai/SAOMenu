@@ -44,7 +44,16 @@
   // ---------- helpers ----------
   function glyph(name, parent) {
     const g = el('span', 'glyph', parent);
-    if (ICONS[name]) g.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`;
+    if (ICONS[name]) {
+      g.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`;
+      // center the drawing itself: some glyphs sit a little off in their 24px box
+      try {
+        const b = g.firstChild.getBBox();
+        if (b.width && b.height) {
+          g.firstChild.setAttribute('viewBox', `${b.x + b.width / 2 - 12} ${b.y + b.height / 2 - 12} 24 24`);
+        }
+      } catch (e) { /* not rendered yet: keep the default box */ }
+    }
     else g.textContent = [...String(name || '')].slice(0, 2).join('');
     return g;
   }
@@ -113,7 +122,19 @@
         e.classList.toggle('focus', focus.level === level && focus.idx === i);
       });
     }
+    panels.forEach((p, k) => {
+      // a panel with a child open greys out; its pointer takes the color of the row it touches
+      p.classList.toggle('parent', k < panels.length - 1);
+      const py = parseFloat(p.style.getPropertyValue('--py')) || 0;
+      const rows = p.querySelector('.rows');
+      const hit = [...rows.children].find((r) => {
+        const t = r.offsetTop - rows.scrollTop;
+        return py >= t && py < t + r.offsetHeight;
+      });
+      p.classList.toggle('ptr-hot', !!hit && (hit.classList.contains('selected') || hit.classList.contains('focus')));
+    });
     if (column) {
+      column.classList.toggle('has-sel', path.length > 0);
       // name tags sit on the right until a panel takes that side
       column.classList.toggle('tips-left', path.length > 0);
       column.classList.toggle('tips-off', path.length > 0 && ax < 130);
@@ -200,6 +221,7 @@
     if (dialog) dialog.done(false);
     if (!isOpen || closing) return;
     closing = true;
+    send({ cmd: 'closing' }); // the background blur eases out with the menu
     sfx('close');
     stage.classList.remove('open');
     stage.classList.add('closing');
@@ -215,7 +237,6 @@
   function openPanel(level, node, targetY) {
     const p = el('div', 'panel', stage);
     p.style.left = ax + 2 * R + GAP + (level - 1) * (PANEL_W + PGAP) + 'px';
-    el('header', '', p).textContent = node.label || '';
     const rows = el('div', 'rows', p);
     node.items.forEach((child, i) => {
       const r = el('div', 'row', rows);
@@ -246,6 +267,7 @@
     // a child panel points at a row; scrolling would leave it pointing at nothing
     rows.addEventListener('scroll', () => {
       edges();
+      refresh();
       if (path.length > level) {
         path = path.slice(0, level);
         trimPanels(level);
@@ -259,8 +281,8 @@
     p.style.top = top + 'px';
     p.style.setProperty('--py', clamp(targetY - top, 16, h - 16) + 'px');
     p._top = top;
-    edges();
     panels.push(p);
+    edges();
   }
 
   function rowCenter(level, idx) {

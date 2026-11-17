@@ -845,6 +845,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     /// intro: play the launch sequence first (only used at app start).
     var blurRadius = 6
     var blurTimer: Timer?
+    var blurNow = 0
 
     func show(intro: Bool = false) {
         guard pageReady else { return }
@@ -883,13 +884,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     /// Blurs whatever is behind the overlay, easing the radius in over ~0.2 s.
     func fadeBlur(to target: Int) {
         blurTimer?.invalidate()
-        guard target > 0 else { return setWindowBlur(panel, radius: 0) }
+        let from = blurNow
+        guard from != target else { return }
         var step = 0
         let steps = 8
-        blurTimer = Timer.scheduledTimer(withTimeInterval: 0.025, repeats: true) { [weak self] timer in
+        blurTimer = Timer.scheduledTimer(withTimeInterval: 0.022, repeats: true) { [weak self] timer in
             guard let self = self else { return timer.invalidate() }
             step += 1
-            setWindowBlur(self.panel, radius: target * step / steps)
+            self.blurNow = from + (target - from) * step / steps
+            setWindowBlur(self.panel, radius: self.blurNow)
             if step >= steps { timer.invalidate() }
         }
     }
@@ -897,6 +900,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     func hide() {
         visible = false
         blurTimer?.invalidate()
+        blurNow = 0
         setWindowBlur(panel, radius: 0)
         panel.orderOut(nil)
     }
@@ -924,6 +928,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             pageReady = true
             replyHandler(["ok": true], nil)
             show(intro: true)
+        case "closing":
+            fadeBlur(to: 0)
+            replyHandler(["ok": true], nil)
         case "hide":
             hide()
             replyHandler(["ok": true], nil)

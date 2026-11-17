@@ -42,42 +42,46 @@ html, body {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: var(--paper);
+  /* the disc is inset so that disc plus outer ring fill the 60px box */
+  box-sizing: border-box;
+  padding: 5px;
+  background: var(--paper) content-box;
   color: var(--ink);
   display: grid;
   place-items: center;
-  box-shadow:
-    0 3px 12px rgba(0, 0, 0, 0.32),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.95),
-    inset 0 0 0 3px rgba(0, 0, 0, 0.1);
-  transition: background 0.15s, color 0.15s, transform 0.15s;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.32);
+  transition: background 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
   animation: drop 0.34s cubic-bezier(0.2, 1.25, 0.3, 1) backwards;
   animation-delay: calc(var(--i) * 50ms);
 }
-.icon:hover { transform: scale(1.07); }
-/* focused: orange glyph and a thin orange line inside the white rim */
-.icon.focus {
-  color: var(--orange-deep);
-  transform: scale(1.07);
-  box-shadow:
-    0 4px 16px rgba(224, 138, 0, 0.4),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.95),
-    inset 0 0 0 3.5px rgba(242, 162, 12, 0.9);
+/* thin ring floating just outside the disc */
+.icon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 3px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  transition: border-color 0.15s;
 }
-.icon.selected {
-  background: var(--orange);
+/* Nothing chosen yet: the icon under the pointer lights up like a chosen one.
+   Once one is chosen, the rest turn slightly see-through and hovering one of
+   them only makes it a little more solid. */
+.icon.focus, .icon.selected {
+  background: var(--orange) content-box;
   color: #fff;
-  box-shadow:
-    0 3px 14px rgba(224, 138, 0, 0.55),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.85),
-    inset 0 0 0 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 14px rgba(224, 138, 0, 0.55);
 }
-.icon.selected.focus {
-  box-shadow:
-    0 4px 20px rgba(242, 162, 12, 0.85),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.95),
-    inset 0 0 0 3px rgba(0, 0, 0, 0.08);
+.icon.focus::after, .icon.selected::after { border-color: var(--orange); }
+.has-sel .icon:not(.selected) {
+  background: var(--paper) content-box;
+  color: var(--ink);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.32);
+  opacity: 0.6;
 }
+.has-sel .icon:not(.selected)::after { border-color: rgba(255, 255, 255, 0.85); }
+.has-sel .icon.focus:not(.selected) { opacity: 0.85; }
 /* name tag shown while hovering an icon */
 .icon .tip {
   position: absolute;
@@ -101,7 +105,7 @@ html, body {
 .tips-left .tip { left: auto; right: 100%; margin: 0 14px 0 0; transform: translateX(6px); }
 .icon.selected .tip, .tips-off .tip, .closing .tip { display: none; }
 .icon.fired { animation: flash 0.24s; }
-.icon.error { background: #d8413a; color: #fff; }
+.icon.error { background: #d8413a content-box; color: #fff; }
 
 .glyph { display: grid; place-items: center; font-size: 22px; line-height: 1; }
 .glyph svg {
@@ -126,48 +130,40 @@ html, body {
 
 /* ---------- list panels ---------- */
 
+/* a stack of square tiles, one per row */
 .panel {
+  --tile: var(--paper);
   position: fixed;
   width: var(--panel-w);
-  background: var(--paper);
-  border-radius: 6px;
+  background: var(--tile);
+  border-radius: 2px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.34);
   transform-origin: left var(--py, 50%);
   animation: panel-in 0.22s cubic-bezier(0.2, 0.9, 0.25, 1) backwards;
+  transition: background 0.15s;
 }
-/* pointer toward the item this panel belongs to */
+.panel.parent { --tile: rgba(206, 206, 206, 0.95); }
+/* long pointer toward the item this panel belongs to */
 .panel::before {
   content: "";
   position: absolute;
-  left: -10px;
+  left: -15px;
   top: var(--py, 50%);
   margin-top: -9px;
   border: 9px solid transparent;
   border-left: 0;
-  border-right: 10px solid var(--paper);
+  border-right: 16px solid var(--tile);
+  transition: border-color 0.15s;
 }
+.panel.ptr-hot::before { border-right-color: var(--orange); }
 @keyframes panel-in {
   from { opacity: 0; transform: translateX(-14px) scale(0.3, 0.6); }
 }
 
-.panel header {
-  height: 40px;
-  display: grid;
-  place-items: center;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: #5a5a5a;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.13);
-  white-space: nowrap;
-  overflow: hidden;
-}
-
 .rows {
-  max-height: min(56vh, 440px);
+  max-height: min(60vh, 470px);
   overflow-y: auto;
-  padding: 6px;
+  border-radius: 2px;
 }
 .rows::-webkit-scrollbar { display: none; }
 .rows.more-down { -webkit-mask-image: linear-gradient(#000 calc(100% - 30px), transparent); }
@@ -177,32 +173,37 @@ html, body {
 .row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 38px;
-  padding: 0 10px 0 8px;
-  border-radius: 4px;
-  color: var(--ink);
-  font-size: 13.5px;
+  gap: 12px;
+  height: 46px;
+  padding: 0 12px 0 14px;
+  color: #666;
+  font-family: "Avenir Next Condensed", "DIN Condensed", "PingFang SC", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
 }
-.row + .row { margin-top: 2px; }
+.row + .row { border-top: 1px solid rgba(0, 0, 0, 0.28); }
+/* filled badge with the glyph knocked out in the tile color */
 .row .ico {
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1.5px solid currentColor;
+  background: #646464;
+  color: #fff;
   display: grid;
   place-items: center;
 }
 .row .ico .glyph { font-size: 12px; }
-.row .ico svg { width: 15px; height: 15px; stroke-width: 2; }
+.row .ico svg { width: 16px; height: 16px; stroke-width: 2.1; }
 .row .lbl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .chev { flex: none; font-size: 16px; opacity: 0.7; }
+.row .chev { flex: none; font-size: 17px; opacity: 0.55; }
 
-.row.selected { background: var(--orange-deep); color: #fff; }
-.row.focus { background: var(--orange); color: #fff; }
+.row.selected, .row.focus { background: var(--orange); color: #fff; }
+.row.selected .ico, .row.focus .ico { background: #fff; color: var(--orange-deep); }
 .row.fired { animation: flash 0.24s; }
 .row.error { background: #d8413a; color: #fff; }
+.row.error .ico { background: #fff; color: #d8413a; }
 
 /* ---------- closing ---------- */
 
@@ -361,9 +362,11 @@ html, body {
 
 /* ---------- real app icons ---------- */
 
-.row .ico.app { border-color: transparent; }
-.row .ico.app img { width: 28px; height: 28px; margin: -2px; }
-.icon.app img { width: 44px; height: 44px; }
+.row .ico.app, .row.selected .ico.app, .row.focus .ico.app { background: none; }
+.row .ico.app img { width: 30px; height: 30px; }
+.icon.app img { width: 38px; height: 38px; }
+.icon > .glyph svg { width: 24px; height: 24px; display: block; }
+.icon > .glyph { font-size: 20px; }
 
 /* ---------- confirm dialog ---------- */
 
