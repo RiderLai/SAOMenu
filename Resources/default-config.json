@@ -2,6 +2,8 @@
   "hotkey": "alt+s",
   "sound": true,
   "intro": true,
+  "mouseGesture": true,
+  "trackpad": "tap4",
   "menu": [
     {
       "icon": "user",

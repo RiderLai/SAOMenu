@@ -175,6 +175,276 @@ final class SoundBank {
     }
 }
 
+// MARK: - Mouse gesture
+
+/// Hold the left and right buttons together and drag down to summon the menu.
+/// With Accessibility permission an event tap swallows the second button press,
+/// so the app underneath never sees it. Without permission it falls back to
+/// just watching, which works but can let a context menu through.
+final class MouseGesture {
+    var onTrigger: (() -> Void)?
+    private var enabled = false
+    private var tap: CFMachPort?
+    private var source: CFRunLoopSource?
+    private var monitor: Any?
+    private var retry: Timer?
+
+    private var start: CGPoint?
+    private var fired = false
+    private var swallowUp: CGEventType?
+    private let distance: CGFloat = 70
+
+    func setEnabled(_ on: Bool) {
+        guard on != enabled else { return }
+        enabled = on
+        if on { install() } else { remove() }
+    }
+
+    private func install() {
+        if installTap() { return }
+        let mask: NSEvent.EventTypeMask = [
+            .leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp,
+            .leftMouseDragged, .rightMouseDragged,
+        ]
+        monitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in self?.watch() }
+        // switch to the tap as soon as permission is granted
+        retry = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            guard let self = self, self.enabled, self.tap == nil, self.installTap() else { return }
+            self.removeMonitor()
+        }
+    }
+
+    private func removeMonitor() {
+        if let m = monitor { NSEvent.removeMonitor(m) }
+        monitor = nil
+        retry?.invalidate()
+        retry = nil
+    }
+
+    private func remove() {
+        removeMonitor()
+        if let port = tap {
+            CGEvent.tapEnable(tap: port, enable: false)
+            if let src = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), src, .commonModes) }
+            CFMachPortInvalidate(port)
+        }
+        tap = nil
+        source = nil
+        start = nil
+        swallowUp = nil
+    }
+
+    private func installTap() -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let types: [CGEventType] = [
+            .leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp,
+            .leftMouseDragged, .rightMouseDragged,
+        ]
+        let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << CGEventMask($1.rawValue)) }
+        guard let port = CGEvent.tapCreate(
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: { _, type, event, refcon in
+                guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
+                let me = Unmanaged<MouseGesture>.fromOpaque(refcon).takeUnretainedValue()
+                return me.handle(type, event) ? nil : Unmanaged.passUnretained(event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque())
+        else { return false }
+        let src = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, port, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), src, .commonModes)
+        CGEvent.tapEnable(tap: port, enable: true)
+        tap = port
+        source = src
+        return true
+    }
+
+    /// Event tap path. Returns true to swallow the event.
+    private func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
+        switch type {
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            if let port = tap { CGEvent.tapEnable(tap: port, enable: true) }
+            return false
+        case .leftMouseDown, .rightMouseDown:
+            let other: CGMouseButton = type == .leftMouseDown ? .right : .left
+            guard CGEventSource.buttonState(.combinedSessionState, button: other) else { return false }
+            start = event.location
+            fired = false
+            swallowUp = type == .leftMouseDown ? .leftMouseUp : .rightMouseUp
+            return true
+        case .leftMouseDragged, .rightMouseDragged:
+            guard let s = start else { return false }
+            let p = event.location  // y grows downward here
+            let dy = p.y - s.y
+            if !fired && dy > distance && abs(p.x - s.x) < dy {
+                fired = true
+                onTrigger?()
+            }
+            return true
+        case .leftMouseUp, .rightMouseUp:
+            start = nil
+            if type == swallowUp {
+                swallowUp = nil
+                return true
+            }
+            return false
+        default:
+            return false
+        }
+    }
+
+    /// Fallback path without permission: observe only.
+    private func watch() {
+        let both = NSEvent.pressedMouseButtons & 3 == 3
+        let p = NSEvent.mouseLocation  // y grows upward here
+        guard both else {
+            start = nil
+            return
+        }
+        guard let s = start else {
+            start = p
+            fired = false
+            return
+        }
+        let dy = s.y - p.y
+        if !fired && dy > distance && abs(p.x - s.x) < dy {
+            fired = true
+            onTrigger?()
+        }
+    }
+}
+
+// MARK: - Trackpad tap
+
+/// Detects an N-finger tap on the trackpad. macOS has no public API for global
+/// trackpad touches, so this reads them from the private MultitouchSupport
+/// framework, loaded at runtime; if anything is missing the feature stays off.
+final class TrackpadTap {
+    static let shared = TrackpadTap()
+    var onTap: (() -> Void)?
+    private(set) var available = false
+
+    private typealias Callback = @convention(c) (
+        UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, Int32, Double, Int32
+    ) -> Int32
+    private typealias CreateList = @convention(c) () -> Unmanaged<CFArray>?
+    private typealias Register = @convention(c) (UnsafeMutableRawPointer, Callback) -> Void
+    private typealias Start = @convention(c) (UnsafeMutableRawPointer, Int32) -> Int32
+    private typealias Stop = @convention(c) (UnsafeMutableRawPointer) -> Int32
+
+    private var devices: [UnsafeMutableRawPointer] = []
+    private var retry: Timer?
+    private var unregister: Register?
+    private var stop: Stop?
+
+    // touch state, only used on the framework's callback thread
+    private var target = 0
+    private var maxCount = 0
+    private var began = 0.0
+    private var origin: (Float, Float)?
+    private var moved = false
+
+    /// fingers: 3, 4 or 5; 0 turns the gesture off.
+    func setFingers(_ fingers: Int) {
+        guard fingers != target else { return }
+        target = fingers
+        retry?.invalidate()
+        retry = nil
+        if fingers == 0 { return stopDevices() }
+        if devices.isEmpty { startDevices() }
+        if devices.isEmpty {
+            // no trackpad right now (e.g. a Bluetooth one that is off): keep looking
+            retry = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] timer in
+                guard let self = self else { return }
+                self.startDevices()
+                if !self.devices.isEmpty { timer.invalidate() }
+            }
+        }
+    }
+
+    private func startDevices() {
+        guard let lib = dlopen(
+            "/System/Library/PrivateFrameworks/MultitouchSupport.framework/MultitouchSupport", RTLD_NOW),
+            let pList = dlsym(lib, "MTDeviceCreateList"),
+            let pReg = dlsym(lib, "MTRegisterContactFrameCallback"),
+            let pUnreg = dlsym(lib, "MTUnregisterContactFrameCallback"),
+            let pStart = dlsym(lib, "MTDeviceStart"),
+            let pStop = dlsym(lib, "MTDeviceStop")
+        else {
+            NSLog("trackpad: MultitouchSupport unavailable")
+            return
+        }
+        let createList = unsafeBitCast(pList, to: CreateList.self)
+        let register = unsafeBitCast(pReg, to: Register.self)
+        let start = unsafeBitCast(pStart, to: Start.self)
+        unregister = unsafeBitCast(pUnreg, to: Register.self)
+        stop = unsafeBitCast(pStop, to: Stop.self)
+
+        guard let list = createList()?.takeRetainedValue() else { return }
+        let callback: Callback = { _, touches, count, _, _ in
+            TrackpadTap.shared.frame(touches, Int(count))
+            return 0
+        }
+        for i in 0..<CFArrayGetCount(list) {
+            guard let raw = CFArrayGetValueAtIndex(list, i) else { continue }
+            let device = UnsafeMutableRawPointer(mutating: raw)
+            _ = Unmanaged<AnyObject>.fromOpaque(raw).retain()  // keep the device alive
+            register(device, callback)
+            _ = start(device, 0)
+            devices.append(device)
+        }
+        available = !devices.isEmpty
+        if available { NSLog("trackpad: watching %d device(s)", devices.count) }
+    }
+
+    private func stopDevices() {
+        let callback: Callback = { _, _, _, _, _ in 0 }
+        for device in devices {
+            unregister?(device, callback)
+            _ = stop?(device)
+        }
+        devices.removeAll()
+    }
+
+    /// One frame of touch data. A tap is: fingers land, never exceed or move
+    /// away from the target count's starting spot, and all lift quickly.
+    private func frame(_ touches: UnsafeMutableRawPointer?, _ count: Int) {
+        let now = CFAbsoluteTimeGetCurrent()
+        if count == 0 {
+            if target > 0 && maxCount == target && !moved && now - began < 0.35 {
+                DispatchQueue.main.async { self.onTap?() }
+            }
+            maxCount = 0
+            origin = nil
+            moved = false
+            return
+        }
+        if maxCount == 0 { began = now }
+        if count > maxCount {
+            maxCount = count
+            origin = nil
+        }
+        guard count == maxCount, let touches = touches else { return }
+        // Each touch record is 96 bytes with the normalized position at offset 32.
+        var x: Float = 0, y: Float = 0
+        for i in 0..<count {
+            let px = touches.load(fromByteOffset: i * 96 + 32, as: Float.self)
+            let py = touches.load(fromByteOffset: i * 96 + 36, as: Float.self)
+            // positions are 0...1; anything else means the layout isn't what we expect
+            guard px > -0.5, px < 1.5, py > -0.5, py < 1.5 else { return }
+            x += px
+            y += py
+        }
+        x /= Float(count)
+        y /= Float(count)
+        if let o = origin {
+            if hypot(x - o.0, y - o.1) > 0.04 { moved = true }
+        } else {
+            origin = (x, y)
+        }
+    }
+}
+
 // MARK: - Window
 
 final class OverlayPanel: NSPanel {
@@ -203,6 +473,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     var pendingToast: String?
     let sounds = SoundBank()
     var introEnabled = true
+    let mouseGesture = MouseGesture()
     var settingsWindow: NSWindow?
     var settingsWeb: WKWebView?
 
@@ -213,6 +484,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         buildPanel()
         buildStatusItem()
         buildMainMenu()
+        mouseGesture.onTrigger = { [weak self] in
+            guard let self = self, !self.visible else { return }
+            self.show()
+        }
+        TrackpadTap.shared.onTap = { [weak self] in self?.toggle() }
         installHotKeyHandler()
         registerHotKey(hotkeyText)
     }
@@ -331,7 +607,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let text = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
             let defaults = Bundle.main.url(forResource: "default-config", withExtension: "json")
                 .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "{}"
-            reply(["text": text, "defaults": defaults], nil)
+            reply(["text": text, "defaults": defaults, "trusted": AXIsProcessTrusted()], nil)
+        case "axPrompt":
+            // shows the system dialog that leads to the Accessibility settings
+            let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+            reply(["trusted": AXIsProcessTrustedWithOptions([key: true] as CFDictionary)], nil)
         case "save":
             guard let text = body["text"] as? String, let data = text.data(using: .utf8),
                 (try? JSONSerialization.jsonObject(with: data)) is [String: Any]
@@ -435,6 +715,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
             let json = String(data: try JSONSerialization.data(withJSONObject: obj), encoding: .utf8)!
             webView.evaluateJavaScript("SAO.setConfig(\(json))")
             introEnabled = (obj["intro"] as? Bool) ?? true
+            mouseGesture.setEnabled((obj["mouseGesture"] as? Bool) ?? false)
+            let taps = ["tap3": 3, "tap4": 4, "tap5": 5]
+            TrackpadTap.shared.setFingers(taps[(obj["trackpad"] as? String) ?? "off"] ?? 0)
             sounds.enabled = (obj["sound"] as? Bool) ?? true
             sounds.volume = Float(max(0, min(1, (obj["volume"] as? Double) ?? 0.7)))
             let hk = (obj["hotkey"] as? String) ?? "alt+s"

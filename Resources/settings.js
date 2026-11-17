@@ -31,6 +31,7 @@
   };
 
   let cfg = null;
+  let trusted = false; // Accessibility permission, needed to fully intercept the mouse gesture
   let defaults = '{}';
   let sel = 'general'; // 'general' or an index path into cfg.menu
   let armed = null; // which destructive button is waiting for a second click
@@ -415,6 +416,18 @@
     return btn;
   }
 
+  function trackpadSelect() {
+    const options = [['off', '关闭'], ['tap4', '四指轻点（推荐）'], ['tap5', '五指轻点'], ['tap3', '三指轻点']];
+    const box = h('select', {
+      onchange: () => {
+        cfg.trackpad = box.value;
+        changed();
+      },
+    }, options.map(([v, name]) => h('option', { value: v }, name)));
+    box.value = options.some(([v]) => v === cfg.trackpad) ? cfg.trackpad : 'off';
+    return box;
+  }
+
   function renderGeneral(form) {
     $('title').textContent = '通用设置';
     const vol = h('input', {
@@ -430,6 +443,14 @@
 
     form.append(
       field('呼出热键', hotkeyButton(), h('span', { class: 'hint' }, '点击按钮后按下新的组合键，Esc 取消。')),
+      field('鼠标手势',
+        check('同时按住左键和右键向下划，呼出菜单', cfg.mouseGesture === true, (on) => { cfg.mouseGesture = on; changed(); }),
+        trusted
+          ? h('span', { class: 'hint' }, '已获得「辅助功能」权限，手势中的按键不会传给下面的应用。')
+          : h('span', { class: 'hint' }, '没有「辅助功能」权限时也能用，但下面的应用可能同时弹出右键菜单。授权后会自动切换。'),
+        trusted ? null : h('button', { onclick: () => send({ cmd: 'axPrompt' }) }, '去授权…')),
+      field('触控板手势', trackpadSelect(),
+        h('span', { class: 'hint' }, '轻点不会和系统的滑动、捏合手势冲突，再点一次收起菜单。如果系统开启了「三指轻点查询」，不要选三指。')),
       h('div', { class: 'sep' }),
       field('音效', check('播放音效', cfg.sound !== false, (on) => { cfg.sound = on; changed(); })),
       field('音量', vol, volText),
@@ -483,6 +504,7 @@
   async function load() {
     const res = await send({ cmd: 'load' });
     defaults = (res && res.defaults) || '{}';
+    trusted = !!(res && res.trusted);
     try {
       adopt((res && res.text) || '');
       showError(null);
