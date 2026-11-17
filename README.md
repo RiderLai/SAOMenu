@@ -80,3 +80,15 @@
 - `sound` / `volume`：音效开关和音量（0–1，默认 0.7）。
 - 自定义音效：把音频文件放进 `~/.config/sao-menu/sounds/`，文件名为 `open` `close` `select` `move` `back` `launch` `error`（菜单）或 `dive` `tick` `welcome` `warp`（启动动画）之一，扩展名 `wav` / `mp3` / `m4a` / `aiff`，下次呼出菜单时生效；没有对应文件时用内置的合成音。
 - `icon`：内置名称 `user users message map gear folder file star home download desktop grid list code terminal globe image music book heart logout sword`，或者直接写一个 emoji / 文字。列表项不写 `icon` 时按路径自动选择。
+
+## 声明
+
+这是一个非官方的同人项目，与《刀剑神域》（Sword Art Online）的作者、出版方及其他版权方没有任何关联，也未获得其授权或认可。“Sword Art Online” 及相关名称归各自的权利人所有。
+
+本仓库不包含原作的任何音频、图片、字体或标志：界面和图标是重新绘制的，音效是程序合成的。项目仅供个人学习和使用，不用于商业用途。
+
+## 许可证
+
+本项目以 [GNU General Public License v3.0](LICENSE) 发布。你可以自由使用、修改和分发，但分发修改后的版本时必须以同样的许可证公开源代码。
+
+Copyright (C) 2026 SAO Menu contributors
