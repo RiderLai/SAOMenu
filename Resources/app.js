@@ -256,6 +256,21 @@
       rows.classList.toggle('more-up', rows.scrollTop > 2);
       rows.classList.toggle('more-down', rows.scrollTop + rows.clientHeight < rows.scrollHeight - 2);
     };
+    // A mouse wheel sends big jumps that would fling the list to its end.
+    // Step one row per notch instead, eased; trackpads keep native scrolling.
+    let wheelTo = null, wheelTimer = 0;
+    rows.addEventListener('wheel', (e) => {
+      const d = e.wheelDeltaY;
+      if (!d || Math.abs(d) < 120 || d % 120 !== 0) return; // trackpad: fine-grained deltas
+      e.preventDefault();
+      const rowH = rows.firstElementChild ? rows.firstElementChild.offsetHeight : 46;
+      const max = rows.scrollHeight - rows.clientHeight;
+      const from = wheelTo === null ? rows.scrollTop : wheelTo;
+      wheelTo = clamp(Math.round((from + (d < 0 ? rowH : -rowH)) / rowH) * rowH, 0, max);
+      rows.scrollTo({ top: wheelTo, behavior: 'smooth' });
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => { wheelTo = null; }, 400);
+    }, { passive: false });
     // a child panel points at a row; scrolling would leave it pointing at nothing
     rows.addEventListener('scroll', () => {
       edges();
