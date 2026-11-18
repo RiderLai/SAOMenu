@@ -99,6 +99,7 @@
 - `trackpad`：触控板手势，`off` / `tap3` / `tap4` / `tap5`（三、四、五指轻点）。
 - `intro`：启动动画开关，默认 `true`；设为 `false` 则启动后直接弹出菜单。动画播放中按任意键或点击可跳过。
 - `welcome`：启动动画结尾的欢迎语，默认 `Welcome to Sword Art Online!`。
+- `maxRows`：一个子菜单最多同时显示的行数，2–20，默认 `7`；超过的可以滚动，边缘的选项渐隐。
 - `blur`：菜单呼出时背景的模糊程度，0–40，默认 `6`，`0` 为关闭。
 - `sound` / `volume`：音效开关和音量（0–1，默认 0.7）。
 - 自定义音效：把音频文件放进 `~/.config/sao-menu/sounds/`，文件名为 `open` `close` `select` `move` `back` `launch` `error`（菜单）或 `dive` `tick` `welcome` `warp`（启动动画）之一，扩展名 `wav` / `mp3` / `m4a` / `aiff`，下次呼出菜单时生效；没有对应文件时用内置的合成音。

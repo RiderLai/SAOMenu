@@ -75,6 +75,7 @@ SAO Menu 是一个 macOS 快捷菜单：一列圆形图标，逐级展开面板�
 
 - `hotkey`：`cmd` / `alt` / `ctrl` / `shift` 加一个键，用 `+` 连接，如 `ctrl+alt+space`。F1–F12 可以单独使用。
 - `sound`（布尔）、`volume`（0–1）、`intro`（启动动画，布尔）、`welcome`（启动动画结尾的欢迎语）。
+- `maxRows`：子菜单最多同时显示的行数，2–20 的整数，默认 7，超过的滚动显示。
 - `blur`：呼出菜单时背景的模糊程度，0–40 的数字，默认 6，0 关闭。
 - `mouseGesture`：`right`（按住右键向下划）/ `both`（同时按住左右键向下划）/ `off`。
 - `trackpad`：`tap3` / `tap4` / `tap5`（三、四、五指轻点）/ `off`。

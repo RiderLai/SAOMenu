@@ -148,6 +148,9 @@ def main():
     volume = cfg.get("volume", 0.7)
     if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not 0 <= volume <= 1:
         errors.append("volume must be a number from 0 to 1")
+    rows = cfg.get("maxRows", 7)
+    if isinstance(rows, bool) or not isinstance(rows, int) or not 2 <= rows <= 20:
+        errors.append("maxRows must be a whole number from 2 to 20")
     blur = cfg.get("blur", 6)
     if isinstance(blur, bool) or not isinstance(blur, (int, float)) or not 0 <= blur <= 40:
         errors.append("blur must be a number from 0 to 40")

@@ -488,6 +488,20 @@
     vol.value = cfg.volume == null ? 0.7 : cfg.volume;
     const volText = h('span', { class: 'hint', style: 'flex-basis:auto' }, Math.round(vol.value * 100) + '%');
 
+    const num = (key, def, min, max) => {
+      const box = h('input', {
+        type: 'number', min: String(min), max: String(max), step: '1', style: 'width:70px;flex:none',
+        onchange: () => {
+          const v = Math.min(max, Math.max(min, Math.round(Number(box.value)) || def));
+          box.value = v;
+          cfg[key] = v;
+          changed();
+        },
+      });
+      box.value = cfg[key] == null ? def : cfg[key];
+      return box;
+    };
+
     form.append(
       field('呼出热键', hotkeyButton(), h('span', { class: 'hint' }, '点击按钮后按下新的组合键，Esc 取消。')),
       field('鼠标手势', mouseSelect(),
@@ -497,6 +511,11 @@
         trusted ? null : h('button', { onclick: () => send({ cmd: 'axPrompt' }) }, '去授权…')),
       field('触控板手势', trackpadSelect(),
         h('span', { class: 'hint' }, '轻点不会和系统的滑动、捏合手势冲突，再点一次收起菜单。如果系统开启了「三指轻点查询」，不要选三指。')),
+      h('div', { class: 'sep' }),
+      field('子菜单行数', num('maxRows', 7, 2, 20),
+        h('span', { class: 'hint' }, '一个子菜单最多同时显示几项；超过的可以滚动，边缘的选项会渐渐淡出。')),
+      field('背景模糊', num('blur', 6, 0, 40),
+        h('span', { class: 'hint' }, '菜单呼出时背后画面的模糊程度，0 为关闭。')),
       h('div', { class: 'sep' }),
       field('音效', check('播放音效', cfg.sound !== false, (on) => { cfg.sound = on; changed(); })),
       field('音量', vol, volText),

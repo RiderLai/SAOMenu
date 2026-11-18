@@ -122,17 +122,7 @@
         e.classList.toggle('focus', focus.level === level && focus.idx === i);
       });
     }
-    panels.forEach((p, k) => {
-      // a panel with a child open greys out; its pointer takes the color of the row it touches
-      p.classList.toggle('parent', k < panels.length - 1);
-      const py = parseFloat(p.style.getPropertyValue('--py')) || 0;
-      const rows = p.querySelector('.rows');
-      const hit = [...rows.children].find((r) => {
-        const t = r.offsetTop - rows.scrollTop;
-        return py >= t && py < t + r.offsetHeight;
-      });
-      p.classList.toggle('ptr-hot', !!hit && (hit.classList.contains('selected') || hit.classList.contains('focus')));
-    });
+    layoutPanels();
     if (column) {
       column.classList.toggle('has-sel', path.length > 0);
       // name tags sit on the right until a panel takes that side
@@ -185,6 +175,7 @@
     const totalW = 2 * R + GAP + depthOf(menu) * (PANEL_W + PGAP);
     ax = clamp(x - R, PAD, Math.max(PAD, W - totalW - PAD));
 
+    stage.style.setProperty('--max-rows', clamp(Math.round(Number(config.maxRows) || 7), 2, 20));
     column = el('div', 'column', stage);
     column.style.left = ax + 'px';
     column.style.top = ay + 'px';
@@ -234,7 +225,7 @@
   }
 
   // ---------- panels ----------
-  function openPanel(level, node, targetY) {
+  function openPanel(level, node) {
     const p = el('div', 'panel', stage);
     p.style.left = ax + 2 * R + GAP + (level - 1) * (PANEL_W + PGAP) + 'px';
     const rows = el('div', 'rows', p);
@@ -246,8 +237,9 @@
       el('span', 'lbl', r).textContent =
         child.label || actionText(child.action) || '—';
       if (child.items && child.items.length) el('span', 'chev', r).textContent = '›';
-      r.addEventListener('mouseenter', () => {
-        if (focus.level !== level || focus.idx !== i) {
+      // mousemove, not mouseenter: a panel sliding under a resting pointer must not move the focus
+      r.addEventListener('mousemove', () => {
+        if (realMove && (focus.level !== level || focus.idx !== i)) {
           focus = { level, idx: i };
           refresh();
           sfx('move');
@@ -276,20 +268,32 @@
     });
     p.addEventListener('click', (e) => e.stopPropagation());
 
-    const h = p.offsetHeight;
-    const top = clamp(targetY - h / 2, PAD, Math.max(PAD, innerHeight - h - PAD));
-    p.style.top = top + 'px';
-    p.style.setProperty('--py', clamp(targetY - top, 16, h - 16) + 'px');
-    p._top = top;
     panels.push(p);
+    layoutPanels();
     edges();
   }
 
-  function rowCenter(level, idx) {
-    const p = panels[level - 1];
-    const r = elsAt(level)[idx];
-    const rows = p.querySelector('.rows');
-    return p._top + r.offsetTop - rows.scrollTop + r.offsetHeight / 2;
+  /**
+   * Places every panel. Each one points at the item it belongs to. While a
+   * panel has a child open, it slides so that its chosen row sits right at the
+   * pointer, which puts the whole open path on one line; otherwise it is
+   * centered on the pointer.
+   */
+  function layoutPanels() {
+    let target = iconY(path[0] || 0);
+    panels.forEach((p, k) => {
+      const level = k + 1;
+      const rows = p.querySelector('.rows');
+      const chosen = k < panels.length - 1 ? rows.children[path[level]] : null;
+      const h = p.offsetHeight;
+      const mid = chosen ? chosen.offsetTop - rows.scrollTop + chosen.offsetHeight / 2 : h / 2;
+      const top = clamp(target - mid, PAD, Math.max(PAD, innerHeight - h - PAD));
+      p.style.top = top + 'px';
+      // the pointer stays on the chosen row even if the screen edge got in the way
+      p.style.setProperty('--py', clamp(chosen ? mid : target - top, 12, h - 12) + 'px');
+      p.classList.toggle('parent', !!chosen);
+      if (chosen) target = top + mid;
+    });
   }
 
   function collapse() {
@@ -320,7 +324,7 @@
     }
 
     if (hasItems) {
-      openPanel(level + 1, node, level === 0 ? iconY(idx) : rowCenter(level, idx));
+      openPanel(level + 1, node);
       if (enter) focus = { level: level + 1, idx: 0 };
       sfx('select');
     } else if (run) {
@@ -367,6 +371,13 @@
   }
 
   // ---------- input ----------
+  // tells a real pointer move from the events fired when content moves under it
+  let realMove = false, lastX = -1, lastY = -1;
+  document.addEventListener('mousemove', (e) => {
+    realMove = e.screenX !== lastX || e.screenY !== lastY;
+    lastX = e.screenX;
+    lastY = e.screenY;
+  }, true);
   stage.addEventListener('mousedown', (e) => {
     if (e.target === stage || e.target.id === 'dim') close();
   });
