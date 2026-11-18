@@ -50,6 +50,7 @@ html, body {
   display: grid;
   place-items: center;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.32);
+  opacity: 0.88; /* a little see-through at rest, more once another icon is chosen */
   transition: background 0.15s, color 0.15s, transform 0.15s, opacity 0.15s;
   animation: drop 0.34s cubic-bezier(0.2, 1.25, 0.3, 1) backwards;
   animation-delay: calc(var(--i) * 50ms);
@@ -65,23 +66,21 @@ html, body {
   pointer-events: none;
   transition: border-color 0.15s;
 }
-/* Nothing chosen yet: the icon under the pointer lights up like a chosen one.
-   Once one is chosen, the rest turn slightly see-through and hovering one of
-   them only makes it a little more solid. */
+/* The icon under the pointer lights up like a chosen one. Once one is chosen,
+   the rest turn more see-through, and a hovered one stays partly so. */
 .icon.focus, .icon.selected {
   background: var(--orange) content-box;
   color: #fff;
   box-shadow: 0 3px 14px rgba(224, 138, 0, 0.55);
+  opacity: 1;
 }
 .icon.focus::after, .icon.selected::after { border-color: var(--orange); }
-.has-sel .icon:not(.selected) {
-  background: var(--paper) content-box;
-  color: var(--ink);
+.has-sel .icon:not(.selected) { opacity: 0.5; }
+/* hovered beside a chosen icon: orange too, but fainter and without the glow */
+.has-sel .icon.focus:not(.selected) {
+  opacity: 0.75;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.32);
-  opacity: 0.6;
 }
-.has-sel .icon:not(.selected)::after { border-color: rgba(255, 255, 255, 0.85); }
-.has-sel .icon.focus:not(.selected) { opacity: 0.85; }
 /* name tag shown while hovering an icon */
 .icon .tip {
   position: absolute;
