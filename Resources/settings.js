@@ -149,11 +149,13 @@
       const row = h('div', {
         class: 'trow' + (base.length ? '' : ' top') + (same(sel, path) ? ' sel' : ''),
         style: `padding-left:${10 + base.length * 20}px`,
-        onclick: () => select(path),
+        onclick: () => { if (!justDragged) select(path); },
+        onmousedown: (e) => startDrag(e, path, row),
       },
         glyph(iconOf(node, !base.length)),
         h('span', { class: 'tl' }, node.label || '（未命名）'),
         node.items ? h('span', { class: 'tc' }, String(node.items.length)) : null);
+      row._path = path;
       tree.append(row);
       if (node.items) walk(node.items, path);
     });
@@ -173,6 +175,106 @@
     $('del').classList.toggle('armed', armed === 'del');
     $('restore').textContent = armed === 'restore' ? '确认恢复默认' : '恢复默认配置';
     $('restore').classList.toggle('armed', armed === 'restore');
+  }
+
+  // ---------- drag to reorder ----------
+  // Drag a row onto another: its upper part drops before it, its lower part
+  // after it, and the middle of a submenu row drops into that submenu. Works
+  // across levels and across top-level icons.
+  let justDragged = false;
+
+  function startDrag(down, from, row) {
+    if (down.button !== 0) return;
+    const tree = $('tree');
+    const node = nodeAt(from);
+    let active = false, drop = null, ghost = null;
+    const line = h('div', { class: 'dropline' });
+    const rows = () => [...tree.querySelectorAll('.trow')].filter((r) => r._path);
+    const inside = (p) => from.every((v, i) => p[i] === v); // p is the dragged row or below it
+
+    const clear = () => {
+      line.remove();
+      tree.querySelectorAll('.drop-into').forEach((r) => r.classList.remove('drop-into'));
+    };
+    const onMove = (e) => {
+      if (!active) {
+        if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 5) return;
+        active = true;
+        row.classList.add('dragging');
+        document.body.classList.add('drag-on');
+        ghost = h('div', { class: 'dragghost' }, node.label || '（未命名）');
+        document.body.append(ghost);
+      }
+      ghost.style.left = e.clientX + 12 + 'px';
+      ghost.style.top = e.clientY + 8 + 'px';
+      const box = tree.getBoundingClientRect();
+      if (e.clientY < box.top + 26) tree.scrollTop -= 10;
+      else if (e.clientY > box.bottom - 26) tree.scrollTop += 10;
+
+      clear();
+      drop = null;
+      const all = rows();
+      let target = all.find((r) => {
+        const b = r.getBoundingClientRect();
+        return e.clientY >= b.top && e.clientY < b.bottom;
+      });
+      // below the last row: append at the top level
+      if (!target && all.length && e.clientY >= all[all.length - 1].getBoundingClientRect().bottom
+          && e.clientX >= box.left && e.clientX <= box.right) {
+        target = all.find((r) => r._path.length === 1 && r._path[0] === cfg.menu.length - 1);
+        if (target && !inside(target._path)) drop = { target, where: 'after' };
+      } else if (target && !inside(target._path)) {
+        const b = target.getBoundingClientRect();
+        const t = (e.clientY - b.top) / b.height;
+        const folder = !!nodeAt(target._path).items;
+        const where = folder ? (t < 0.28 ? 'before' : t > 0.72 ? 'after' : 'into') : (t < 0.5 ? 'before' : 'after');
+        drop = { target, where };
+      }
+      if (!drop) return;
+      if (drop.where === 'into') return drop.target.classList.add('drop-into');
+      // "after" a submenu means after everything inside it
+      let edge = drop.target;
+      if (drop.where === 'after') {
+        const p = drop.target._path;
+        all.forEach((r) => { if (p.every((v, i) => r._path[i] === v)) edge = r; });
+      }
+      const eb = edge.getBoundingClientRect();
+      line.style.top = (drop.where === 'before' ? eb.top : eb.bottom) - box.top + tree.scrollTop - 1 + 'px';
+      line.style.left = 10 + (drop.target._path.length - 1) * 20 + 'px';
+      tree.append(line);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (!active) return;
+      clear();
+      if (ghost) ghost.remove();
+      row.classList.remove('dragging');
+      document.body.classList.remove('drag-on');
+      justDragged = true; // swallow the click that follows this mouseup
+      setTimeout(() => { justDragged = false; }, 0);
+      if (!drop) return;
+      const targetNode = nodeAt(drop.target._path);
+      const destList = drop.where === 'into' ? targetNode.items : listAt(drop.target._path.slice(0, -1));
+      const srcList = listAt(from.slice(0, -1));
+      srcList.splice(from[from.length - 1], 1);
+      if (drop.where === 'into') destList.push(node);
+      else destList.splice(destList.indexOf(targetNode) + (drop.where === 'after' ? 1 : 0), 0, node);
+      const find = (items, base) => {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i] === node) return base.concat(i);
+          const deep = items[i].items && find(items[i].items, base.concat(i));
+          if (deep) return deep;
+        }
+        return null;
+      };
+      sel = find(cfg.menu, []) || 'general';
+      armed = null;
+      render();
+      changed();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   }
 
   $('add').onclick = () => {
