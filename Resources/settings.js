@@ -136,6 +136,13 @@
     render();
   }
 
+  // submenus folded away in the sidebar (view state only, not saved)
+  const collapsed = new WeakSet();
+  function anyOpen() {
+    const open = (items) => items.some((n) => n.items && (!collapsed.has(n) || open(n.items)));
+    return open(cfg.menu);
+  }
+
   function renderTree() {
     const tree = $('tree');
     const scroll = tree.scrollTop;
@@ -143,21 +150,51 @@
     tree.append(
       h('div', { class: 'trow' + (sel === 'general' ? ' sel' : ''), onclick: () => select('general') },
         glyph('gear'), h('span', { class: 'tl' }, '通用设置')),
-      h('div', { class: 'thead' }, '菜单'));
+      h('div', { class: 'thead' }, '菜单',
+        h('span', {
+          class: 'tall',
+          onclick: () => {
+            const all = [];
+            const gather = (items) => items.forEach((n) => { if (n.items) { all.push(n); gather(n.items); } });
+            gather(cfg.menu);
+            const fold = all.some((n) => !collapsed.has(n));
+            all.forEach((n) => (fold ? collapsed.add(n) : collapsed.delete(n)));
+            if (fold && isPath(sel)) sel = sel.slice(0, 1); // its row is about to be hidden
+            render();
+          },
+        }, anyOpen() ? '全部收起' : '全部展开')));
+    // whatever is selected must be visible
+    if (isPath(sel)) for (let k = 1; k < sel.length; k++) collapsed.delete(nodeAt(sel.slice(0, k)));
     const walk = (items, base) => items.forEach((node, i) => {
       const path = base.concat(i);
+      const folded = node.items && collapsed.has(node);
       const row = h('div', {
         class: 'trow' + (base.length ? '' : ' top') + (same(sel, path) ? ' sel' : ''),
-        style: `padding-left:${10 + base.length * 20}px`,
+        style: `padding-left:${4 + base.length * 20}px`,
         onclick: () => { if (!justDragged) select(path); },
         onmousedown: (e) => startDrag(e, path, row),
       },
+        h('span', {
+          class: 'tw' + (node.items ? ' on' : '') + (folded ? '' : ' open'),
+          onmousedown: (e) => e.stopPropagation(), // not the start of a drag
+          onclick: (e) => {
+            if (!node.items) return;
+            e.stopPropagation();
+            if (folded) collapsed.delete(node);
+            else {
+              collapsed.add(node);
+              // a selection inside the folded part moves up to this row
+              if (isPath(sel) && sel.length > path.length && path.every((v, k) => sel[k] === v)) sel = path;
+            }
+            render();
+          },
+        }, node.items ? '›' : ''),
         glyph(iconOf(node, !base.length)),
         h('span', { class: 'tl' }, node.label || '（未命名）'),
         node.items ? h('span', { class: 'tc' }, String(node.items.length)) : null);
       row._path = path;
       tree.append(row);
-      if (node.items) walk(node.items, path);
+      if (node.items && !folded) walk(node.items, path);
     });
     walk(cfg.menu, []);
     tree.scrollTop = scroll;
@@ -240,7 +277,7 @@
       }
       const eb = edge.getBoundingClientRect();
       line.style.top = (drop.where === 'before' ? eb.top : eb.bottom) - box.top + tree.scrollTop - 1 + 'px';
-      line.style.left = 10 + (drop.target._path.length - 1) * 20 + 'px';
+      line.style.left = 24 + (drop.target._path.length - 1) * 20 + 'px';
       tree.append(line);
     };
     const onUp = () => {
