@@ -70,6 +70,8 @@ def check_action(action, where):
             errors.append(f"{where}: action type '{kind}' needs a non-empty '{key}'")
     if kind == "system" and isinstance(action.get("name"), str) and action["name"] not in SYSTEM_NAMES:
         errors.append(f"{where}: unknown system function '{action['name']}'")
+    if kind == "system" and action.get("name") == "emptyTrash" and not action.get("confirm"):
+        warnings.append(f"{where}: emptyTrash deletes files for good; add a confirm")
     for key in ("path", "cwd"):
         value = action.get(key)
         if isinstance(value, str) and value and not os.path.exists(os.path.expanduser(value)):
